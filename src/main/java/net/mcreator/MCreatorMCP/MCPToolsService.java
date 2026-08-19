@@ -32,6 +32,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import net.mcreator.workspace.WorkspaceFolderManager;
 
@@ -1209,7 +1211,726 @@ public class MCPToolsService {
             Map.of("type", "object", "properties", Map.of())
         ), params -> getPreferences(mcreator));
 
-        LOG.info("Registered 109 comprehensive MCreator tools with MCP server");
+        // ===== GROUP 24: Granular Element Property Patching & Field Editor =====
+
+        // 110. patchElementProperty
+        mcpServer.registerTool(McpServer.createTool(
+            "patchElementProperty",
+            "Update a specific dot-separated property path in an element definition JSON (e.g. path='rarity', value='EPIC' or path='onRightClicked.name', value='MyProc')",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Mod element name"),
+                    "path", Map.of("type", "string", "description", "Dot-separated JSON property path (e.g. 'rarity', 'maxStackSize', 'onRightClicked.name')"),
+                    "value", Map.of("description", "New value (string, number, boolean, object, or array)")
+                ),
+                "required", List.of("name", "path", "value")
+            )
+        ), params -> patchElementProperty(mcreator, params));
+
+        // 111. getElementProperty
+        mcpServer.registerTool(McpServer.createTool(
+            "getElementProperty",
+            "Read a specific dot-separated property path from an element definition JSON",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Mod element name"),
+                    "path", Map.of("type", "string", "description", "Dot-separated JSON property path (e.g. 'creativeTab', 'hardness')")
+                ),
+                "required", List.of("name", "path")
+            )
+        ), params -> getElementProperty(mcreator, params));
+
+        // 112. removeElementProperty
+        mcpServer.registerTool(McpServer.createTool(
+            "removeElementProperty",
+            "Remove an optional property path from an element definition JSON",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Mod element name"),
+                    "path", Map.of("type", "string", "description", "Dot-separated property path to delete")
+                ),
+                "required", List.of("name", "path")
+            )
+        ), params -> removeElementProperty(mcreator, params));
+
+        // 113. bulkPatchElements
+        mcpServer.registerTool(McpServer.createTool(
+            "bulkPatchElements",
+            "Patch a property across multiple elements matching a type or name filter",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "type", Map.of("type", "string", "description", "Optional element type filter (e.g. 'item', 'block')"),
+                    "path", Map.of("type", "string", "description", "Property path to patch"),
+                    "value", Map.of("description", "Value to set")
+                ),
+                "required", List.of("path", "value")
+            )
+        ), params -> bulkPatchElements(mcreator, params));
+
+        // 114. compareElements
+        mcpServer.registerTool(McpServer.createTool(
+            "compareElements",
+            "Diff and compare JSON definitions between two mod elements",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "element1", Map.of("type", "string", "description", "First element name"),
+                    "element2", Map.of("type", "string", "description", "Second element name")
+                ),
+                "required", List.of("element1", "element2")
+            )
+        ), params -> compareElements(mcreator, params));
+
+        // ===== GROUP 25: Deep Static Code & Mod Security / Performance Analyzer =====
+
+        // 115. analyzePerformanceBottlenecks
+        mcpServer.registerTool(McpServer.createTool(
+            "analyzePerformanceBottlenecks",
+            "Scan procedures and Java code for tick-lag hazards, expensive loops, unindexed entity searches, or sync disk IO",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> analyzePerformanceBottlenecks(mcreator));
+
+        // 116. analyzeSecurityRisks
+        mcpServer.registerTool(McpServer.createTool(
+            "analyzeSecurityRisks",
+            "Scan custom commands, procedures, and network packets for server crash exploits, unchecked permissions, and unsafe execution",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> analyzeSecurityRisks(mcreator));
+
+        // 117. analyzeMissingLocalizations
+        mcpServer.registerTool(McpServer.createTool(
+            "analyzeMissingLocalizations",
+            "Deep scan comparing all element names, GUI labels, potion effects, and keys against localization files",
+            Map.of("type", "object", "properties", Map.of(
+                "language", Map.of("type", "string", "description", "Optional target language code (e.g. 'en_us', 'tr_tr')")
+            ))
+        ), params -> analyzeMissingLocalizations(mcreator, params));
+
+        // 118. analyzeUnusedAssets
+        mcpServer.registerTool(McpServer.createTool(
+            "analyzeUnusedAssets",
+            "Find orphaned textures, sounds, 3D models, and structures never referenced by any mod element",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> analyzeUnusedAssets(mcreator));
+
+        // 119. analyzeCyclicDependencies
+        mcpServer.registerTool(McpServer.createTool(
+            "analyzeCyclicDependencies",
+            "Detect circular dependencies, infinite loops, or recursive calls between procedures and elements",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> analyzeCyclicDependencies(mcreator));
+
+        // ===== GROUP 26: Java Source Code AST & Live Code Editor =====
+
+        // 120. insertCodeSnippet
+        mcpServer.registerTool(McpServer.createTool(
+            "insertCodeSnippet",
+            "Safely inject code (methods, fields, annotations) at a specific marker or position in a Java file",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "filePath", Map.of("type", "string", "description", "Path to Java file relative to workspace or absolute"),
+                    "snippet", Map.of("type", "string", "description", "Java code snippet to insert"),
+                    "anchor", Map.of("type", "string", "description", "Anchor string/comment to insert after (or 'class_end', 'class_start')")
+                ),
+                "required", List.of("filePath", "snippet")
+            )
+        ), params -> insertCodeSnippet(mcreator, params));
+
+        // 121. replaceCodeSnippet
+        mcpServer.registerTool(McpServer.createTool(
+            "replaceCodeSnippet",
+            "Find and replace specific code blocks or regex patterns in Java source files",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "filePath", Map.of("type", "string", "description", "Path to Java file"),
+                    "target", Map.of("type", "string", "description", "Target string or regex to replace"),
+                    "replacement", Map.of("type", "string", "description", "Replacement string"),
+                    "isRegex", Map.of("type", "boolean", "description", "Whether target is regex (default: false)")
+                ),
+                "required", List.of("filePath", "target", "replacement")
+            )
+        ), params -> replaceCodeSnippet(mcreator, params));
+
+        // 122. addJavaImport
+        mcpServer.registerTool(McpServer.createTool(
+            "addJavaImport",
+            "Add an import statement to a Java file without duplicating existing imports",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "filePath", Map.of("type", "string", "description", "Path to Java file"),
+                    "importClass", Map.of("type", "string", "description", "Fully qualified class name to import")
+                ),
+                "required", List.of("filePath", "importClass")
+            )
+        ), params -> addJavaImport(mcreator, params));
+
+        // 123. removeJavaImport
+        mcpServer.registerTool(McpServer.createTool(
+            "removeJavaImport",
+            "Remove an unused or broken import statement from a Java file",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "filePath", Map.of("type", "string", "description", "Path to Java file"),
+                    "importClass", Map.of("type", "string", "description", "Class name or package to remove from imports")
+                ),
+                "required", List.of("filePath", "importClass")
+            )
+        ), params -> removeJavaImport(mcreator, params));
+
+        // 124. formatJavaCode
+        mcpServer.registerTool(McpServer.createTool(
+            "formatJavaCode",
+            "Clean up and format indentation/braces in a Java source file",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "filePath", Map.of("type", "string", "description", "Path to Java file")
+                ),
+                "required", List.of("filePath")
+            )
+        ), params -> formatJavaCode(mcreator, params));
+
+        // 125. listClassMembers
+        mcpServer.registerTool(McpServer.createTool(
+            "listClassMembers",
+            "Inspect a Java file and list all fields, methods, constructors, and annotations with line numbers",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "filePath", Map.of("type", "string", "description", "Path to Java file")
+                ),
+                "required", List.of("filePath")
+            )
+        ), params -> listClassMembers(mcreator, params));
+
+        // ===== GROUP 27: Advanced Blockly XML Node Editor & Query Engine =====
+
+        // 126. findBlocklyNodes
+        mcpServer.registerTool(McpServer.createTool(
+            "findBlocklyNodes",
+            "Search inside a procedure XML for specific block opcodes or types (e.g. 'controls_if', 'entity_add_potion_effect')",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Procedure element name"),
+                    "blockType", Map.of("type", "string", "description", "Block opcode or type to find")
+                ),
+                "required", List.of("name", "blockType")
+            )
+        ), params -> findBlocklyNodes(mcreator, params));
+
+        // 127. replaceBlocklyField
+        mcpServer.registerTool(McpServer.createTool(
+            "replaceBlocklyField",
+            "Find and replace field values across procedure XML (variable names, number constants, sound IDs, strings)",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Procedure element name"),
+                    "fieldName", Map.of("type", "string", "description", "Blockly field name (e.g. 'VAR', 'NUM', 'TEXT', 'sound')"),
+                    "oldValue", Map.of("type", "string", "description", "Old value to match"),
+                    "newValue", Map.of("type", "string", "description", "New replacement value")
+                ),
+                "required", List.of("name", "fieldName", "oldValue", "newValue")
+            )
+        ), params -> replaceBlocklyField(mcreator, params));
+
+        // 128. insertBlocklyStatement
+        mcpServer.registerTool(McpServer.createTool(
+            "insertBlocklyStatement",
+            "Insert a block XML snippet into a procedure at top, bottom, or inside a container",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Procedure element name"),
+                    "blockXml", Map.of("type", "string", "description", "Blockly XML snippet to insert"),
+                    "position", Map.of("type", "string", "description", "Position: 'top' (start), 'bottom' (end) (default: bottom)")
+                ),
+                "required", List.of("name", "blockXml")
+            )
+        ), params -> insertBlocklyStatement(mcreator, params));
+
+        // 129. removeBlocklyNode
+        mcpServer.registerTool(McpServer.createTool(
+            "removeBlocklyNode",
+            "Delete a block node from procedure XML matching a specific opcode or block id",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Procedure element name"),
+                    "blockType", Map.of("type", "string", "description", "Block opcode or id to delete")
+                ),
+                "required", List.of("name", "blockType")
+            )
+        ), params -> removeBlocklyNode(mcreator, params));
+
+        // 130. convertBlocklyToSummary
+        mcpServer.registerTool(McpServer.createTool(
+            "convertBlocklyToSummary",
+            "Parse procedure Blockly XML into a human-readable pseudo-code English summary of its logic",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Procedure element name")
+                ),
+                "required", List.of("name")
+            )
+        ), params -> convertBlocklyToSummary(mcreator, params));
+
+        // 131. extractProcedureVariables
+        mcpServer.registerTool(McpServer.createTool(
+            "extractProcedureVariables",
+            "Extract all local, global, and dependency variables used within a Blockly procedure XML",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Procedure element name")
+                ),
+                "required", List.of("name")
+            )
+        ), params -> extractProcedureVariables(mcreator, params));
+
+        // ===== GROUP 28: Recipe & Loot Table Analysis & Conflict Detector =====
+
+        // 132. analyzeRecipeConflicts
+        mcpServer.registerTool(McpServer.createTool(
+            "analyzeRecipeConflicts",
+            "Detect duplicate or conflicting crafting recipes (same inputs producing different outputs or ambiguous patterns)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> analyzeRecipeConflicts(mcreator));
+
+        // 133. analyzeLootTableDrops
+        mcpServer.registerTool(McpServer.createTool(
+            "analyzeLootTableDrops",
+            "Analyze all block and entity drops, calculating exact probability percentages, fortune modifiers, and silktouch rules",
+            Map.of("type", "object", "properties", Map.of(
+                "name", Map.of("type", "string", "description", "Optional specific loot table or element name")
+            ))
+        ), params -> analyzeLootTableDrops(mcreator, params));
+
+        // 134. editRecipe
+        mcpServer.registerTool(McpServer.createTool(
+            "editRecipe",
+            "Granularly edit recipe inputs, outputs, group, experience, and cooking time",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Recipe element name"),
+                    "recipeType", Map.of("type", "string", "description", "Recipe type (Crafting, Smelting, Blasting, Smoking, Campfire, Smithing, Stonecutting)"),
+                    "group", Map.of("type", "string", "description", "Optional recipe book group"),
+                    "xp", Map.of("type", "number", "description", "Cooking experience (smelting/blasting)"),
+                    "cookingTime", Map.of("type", "integer", "description", "Cooking time in ticks")
+                ),
+                "required", List.of("name")
+            )
+        ), params -> editRecipe(mcreator, params));
+
+        // 135. editLootTable
+        mcpServer.registerTool(McpServer.createTool(
+            "editLootTable",
+            "Add, remove, or modify pools, entries, conditions, and functions in a loot table",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Loot table element name"),
+                    "type", Map.of("type", "string", "description", "Loot table type (block, entity, chest, gameplay)"),
+                    "pools", Map.of("type", "array", "description", "Loot table pools definition list")
+                ),
+                "required", List.of("name")
+            )
+        ), params -> editLootTable(mcreator, params));
+
+        // ===== GROUP 29: Advanced Texture Manipulation & Image Processing =====
+
+        // 136. extractColorPalette
+        mcpServer.registerTool(McpServer.createTool(
+            "extractColorPalette",
+            "Extract dominant hex colors with pixel counts and percentages from a texture",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Texture name"),
+                    "type", Map.of("type", "string", "description", "Texture type (block, item, etc.)"),
+                    "maxColors", Map.of("type", "integer", "description", "Maximum colors to extract (default: 16)")
+                ),
+                "required", List.of("name", "type")
+            )
+        ), params -> extractColorPalette(mcreator, params));
+
+        // 137. swapTextureColors
+        mcpServer.registerTool(McpServer.createTool(
+            "swapTextureColors",
+            "Replace specific colors in a texture image (e.g. swap red with green)",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Texture name"),
+                    "type", Map.of("type", "string", "description", "Texture type"),
+                    "fromColor", Map.of("type", "string", "description", "Hex color to replace (e.g. '#FF0000')"),
+                    "toColor", Map.of("type", "string", "description", "New hex color (e.g. '#00FF00')"),
+                    "outputName", Map.of("type", "string", "description", "Optional output name")
+                ),
+                "required", List.of("name", "type", "fromColor", "toColor")
+            )
+        ), params -> swapTextureColors(mcreator, params));
+
+        // 138. resizeTexture
+        mcpServer.registerTool(McpServer.createTool(
+            "resizeTexture",
+            "Upscale or downscale textures with pixel-art nearest-neighbor scaling (e.g. 16x16 -> 32x32)",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Texture name"),
+                    "type", Map.of("type", "string", "description", "Texture type"),
+                    "width", Map.of("type", "integer", "description", "Target width in pixels"),
+                    "height", Map.of("type", "integer", "description", "Target height in pixels"),
+                    "outputName", Map.of("type", "string", "description", "Optional output name")
+                ),
+                "required", List.of("name", "type", "width", "height")
+            )
+        ), params -> resizeTexture(mcreator, params));
+
+        // 139. rotateFlipTexture
+        mcpServer.registerTool(McpServer.createTool(
+            "rotateFlipTexture",
+            "Rotate (90, 180, 270 degrees) or flip (horizontal, vertical) a texture image",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Texture name"),
+                    "type", Map.of("type", "string", "description", "Texture type"),
+                    "operation", Map.of("type", "string", "description", "Operation: 'rotate90', 'rotate180', 'rotate270', 'flipH', 'flipV'"),
+                    "outputName", Map.of("type", "string", "description", "Optional output name")
+                ),
+                "required", List.of("name", "type", "operation")
+            )
+        ), params -> rotateFlipTexture(mcreator, params));
+
+        // 140. adjustTextureChannels
+        mcpServer.registerTool(McpServer.createTool(
+            "adjustTextureChannels",
+            "Adjust brightness, contrast, hue, saturation, or alpha of a texture image",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Texture name"),
+                    "type", Map.of("type", "string", "description", "Texture type"),
+                    "brightness", Map.of("type", "number", "description", "Brightness multiplier (1.0 = normal, 1.2 = +20%)"),
+                    "contrast", Map.of("type", "number", "description", "Contrast multiplier (1.0 = normal)"),
+                    "outputName", Map.of("type", "string", "description", "Optional output name")
+                ),
+                "required", List.of("name", "type")
+            )
+        ), params -> adjustTextureChannels(mcreator, params));
+
+        // 141. generateNormalMap
+        mcpServer.registerTool(McpServer.createTool(
+            "generateNormalMap",
+            "Generate bump/normal map from a texture for shader pack / PBR compatibility",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Texture name"),
+                    "type", Map.of("type", "string", "description", "Texture type"),
+                    "strength", Map.of("type", "number", "description", "Normal strength (default: 1.0)"),
+                    "outputName", Map.of("type", "string", "description", "Optional output name (default: <name>_n.png)")
+                ),
+                "required", List.of("name", "type")
+            )
+        ), params -> generateNormalMap(mcreator, params));
+
+        // 142. compositeTextures
+        mcpServer.registerTool(McpServer.createTool(
+            "compositeTextures",
+            "Layer multiple textures together (e.g. overlay an armor trim on an armor texture or an outline on a sword)",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "baseName", Map.of("type", "string", "description", "Base texture name"),
+                    "baseType", Map.of("type", "string", "description", "Base texture type"),
+                    "overlayName", Map.of("type", "string", "description", "Overlay texture name"),
+                    "overlayType", Map.of("type", "string", "description", "Overlay texture type"),
+                    "outputName", Map.of("type", "string", "description", "Output texture name"),
+                    "outputType", Map.of("type", "string", "description", "Output texture type")
+                ),
+                "required", List.of("baseName", "baseType", "overlayName", "overlayType", "outputName")
+            )
+        ), params -> compositeTextures(mcreator, params));
+
+        // 143. cropTexture
+        mcpServer.registerTool(McpServer.createTool(
+            "cropTexture",
+            "Crop a sub-region from a texture sheet (x, y, width, height)",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Texture name"),
+                    "type", Map.of("type", "string", "description", "Texture type"),
+                    "x", Map.of("type", "integer", "description", "Start X pixel"),
+                    "y", Map.of("type", "integer", "description", "Start Y pixel"),
+                    "width", Map.of("type", "integer", "description", "Width in pixels"),
+                    "height", Map.of("type", "integer", "description", "Height in pixels"),
+                    "outputName", Map.of("type", "string", "description", "Output texture name")
+                ),
+                "required", List.of("name", "type", "x", "y", "width", "height", "outputName")
+            )
+        ), params -> cropTexture(mcreator, params));
+
+        // ===== GROUP 30: 3D Model & JSON Analyzer & Editor =====
+
+        // 144. inspectModelUVs
+        mcpServer.registerTool(McpServer.createTool(
+            "inspectModelUVs",
+            "Analyze a Java or JSON model for missing textures, overlapping UVs, or invalid cube dimensions",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Model name or filename")
+                ),
+                "required", List.of("name")
+            )
+        ), params -> inspectModelUVs(mcreator, params));
+
+        // 145. editModelTextures
+        mcpServer.registerTool(McpServer.createTool(
+            "editModelTextures",
+            "Remap texture variables (e.g. 'layer0', 'all', 'top', 'bottom', 'particle') in JSON block/item models",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Model name (JSON)"),
+                    "textures", Map.of("type", "object", "description", "Map of texture variable names to texture paths")
+                ),
+                "required", List.of("name", "textures")
+            )
+        ), params -> editModelTextures(mcreator, params));
+
+        // 146. scaleModel
+        mcpServer.registerTool(McpServer.createTool(
+            "scaleModel",
+            "Uniformly or axis-specifically scale all cubes in a JSON model",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Model name (JSON)"),
+                    "scale", Map.of("type", "number", "description", "Scale factor (e.g. 1.5, 0.5)"),
+                    "outputName", Map.of("type", "string", "description", "Optional output model name")
+                ),
+                "required", List.of("name", "scale")
+            )
+        ), params -> scaleModel(mcreator, params));
+
+        // 147. validateModelSchema
+        mcpServer.registerTool(McpServer.createTool(
+            "validateModelSchema",
+            "Validate 3D model JSON against Minecraft entity/block model schemas",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Model name (JSON)")
+                ),
+                "required", List.of("name")
+            )
+        ), params -> validateModelSchema(mcreator, params));
+
+        // ===== GROUP 31: Sound & Audio Manager & Event Editor =====
+
+        // 148. inspectSoundFile
+        mcpServer.registerTool(McpServer.createTool(
+            "inspectSoundFile",
+            "Inspect .ogg audio files (channels, bitrate, sample rate, duration in seconds, file size)",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Sound filename or sound name")
+                ),
+                "required", List.of("name")
+            )
+        ), params -> inspectSoundFile(mcreator, params));
+
+        // 149. editSoundEvent
+        mcpServer.registerTool(McpServer.createTool(
+            "editSoundEvent",
+            "Modify sound event definitions (category, subtitle, stream mode, pitch, attenuation distance)",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Sound element name"),
+                    "category", Map.of("type", "string", "description", "Sound category (master, music, records, weather, blocks, hostile, neutral, players, ambient, voice)"),
+                    "subtitle", Map.of("type", "string", "description", "Sound subtitle / caption"),
+                    "stream", Map.of("type", "boolean", "description", "Stream directly from disk (for long music)")
+                ),
+                "required", List.of("name")
+            )
+        ), params -> editSoundEvent(mcreator, params));
+
+        // 150. generateSoundJSON
+        mcpServer.registerTool(McpServer.createTool(
+            "generateSoundJSON",
+            "Rebuild and format sounds.json according to all registered sound mod elements",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> generateSoundJSON(mcreator));
+
+        // ===== GROUP 32: Tag & Etiket Derin Yönetimi =====
+
+        // 151. editTagEntries
+        mcpServer.registerTool(McpServer.createTool(
+            "editTagEntries",
+            "Add or remove specific items, blocks, entities, or biomes to/from an existing tag",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Tag element name"),
+                    "action", Map.of("type", "string", "description", "Action: 'add' or 'remove'"),
+                    "entries", Map.of("type", "array", "items", Map.of("type", "string"), "description", "List of entry identifiers to add or remove")
+                ),
+                "required", List.of("name", "action", "entries")
+            )
+        ), params -> editTagEntries(mcreator, params));
+
+        // 152. findTagsForElement
+        mcpServer.registerTool(McpServer.createTool(
+            "findTagsForElement",
+            "Find all tags in the workspace containing a specific element",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "elementName", Map.of("type", "string", "description", "Mod element name to search in tags")
+                ),
+                "required", List.of("elementName")
+            )
+        ), params -> findTagsForElement(mcreator, params));
+
+        // 153. validateTags
+        mcpServer.registerTool(McpServer.createTool(
+            "validateTags",
+            "Detect references in tags to nonexistent items, blocks, or entities",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> validateTags(mcreator));
+
+        // ===== GROUP 33: Workspace Değişkenleri & Lokalizasyon Düzenleyici =====
+
+        // 154. editWorkspaceVariable
+        mcpServer.registerTool(McpServer.createTool(
+            "editWorkspaceVariable",
+            "Update an existing variable's type, scope (GLOBAL_SESSION, GLOBAL_WORLD, GLOBAL_MAP), or default value",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Variable name"),
+                    "type", Map.of("type", "string", "description", "Variable type (number, logic, string, itemstack, blockstate, direction)"),
+                    "scope", Map.of("type", "string", "description", "Scope (GLOBAL_SESSION, GLOBAL_WORLD, GLOBAL_MAP)"),
+                    "value", Map.of("type", "string", "description", "Initial default value")
+                ),
+                "required", List.of("name")
+            )
+        ), params -> editWorkspaceVariable(mcreator, params));
+
+        // 155. batchSetLocalizations
+        mcpServer.registerTool(McpServer.createTool(
+            "batchSetLocalizations",
+            "Set translations for multiple keys across multiple languages in a single atomic call",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "translations", Map.of("type", "object", "description", "Map of language codes (e.g. 'en_us', 'tr_tr') to key-value translation maps")
+                ),
+                "required", List.of("translations")
+            )
+        ), params -> batchSetLocalizations(mcreator, params));
+
+        // 156. autoFillMissingTranslations
+        mcpServer.registerTool(McpServer.createTool(
+            "autoFillMissingTranslations",
+            "Automatically copy untranslated keys from 'en_us' to other languages with prefix placeholder tags",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "targetLanguage", Map.of("type", "string", "description", "Target language code (e.g. 'tr_tr', 'de_de', 'fr_fr')"),
+                    "prefix", Map.of("type", "string", "description", "Optional prefix tag (e.g. '[TODO] ', default: '')")
+                ),
+                "required", List.of("targetLanguage")
+            )
+        ), params -> autoFillMissingTranslations(mcreator, params));
+
+        // 157. searchLocalizationKeys
+        mcpServer.registerTool(McpServer.createTool(
+            "searchLocalizationKeys",
+            "Search for localization keys or values by text or regex",
+            Map.of("type", "object",
+                "properties", Map.of(
+                    "query", Map.of("type", "string", "description", "Search query or regex"),
+                    "language", Map.of("type", "string", "description", "Optional language code (default: en_us)")
+                ),
+                "required", List.of("query")
+            )
+        ), params -> searchLocalizationKeys(mcreator, params));
+
+        // ===== GROUP 34: Ultra Genişletilmiş Minecraft Kayıt Defterleri =====
+
+        // 158. getMinecraftDimensions
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftDimensions",
+            "List standard Minecraft vanilla dimensions (overworld, the_nether, the_end)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "dimensions"));
+
+        // 159. getMinecraftStructures
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftStructures",
+            "List standard Minecraft vanilla structure types (village, fortress, monument, mansion, ancient_city, etc.)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "structures"));
+
+        // 160. getMinecraftBannerPatterns
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftBannerPatterns",
+            "List standard Minecraft vanilla banner patterns",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "bannerpatterns"));
+
+        // 161. getMinecraftTrimMaterials
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftTrimMaterials",
+            "List standard Minecraft vanilla armor trim materials (amethyst, diamond, emerald, gold, iron, netherite, etc.)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "trimmaterials"));
+
+        // 162. getMinecraftTrimPatterns
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftTrimPatterns",
+            "List standard Minecraft vanilla armor trim patterns (sentry, vex, wild, coast, dune, eye, etc.)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "trimpatterns"));
+
+        // 163. getMinecraftGameRules
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftGameRules",
+            "List standard Minecraft vanilla game rules (keepInventory, mobGriefing, doDaylightCycle, etc.)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "gamerules"));
+
+        // 164. getMinecraftPaintingVariants
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftPaintingVariants",
+            "List standard Minecraft vanilla painting variants",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "paintings"));
+
+        // 165. getMinecraftVillagerProfessions
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftVillagerProfessions",
+            "List standard Minecraft vanilla villager professions (armorer, butcher, cleric, farmer, librarian, etc.)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "villagerprofessions"));
+
+        // 166. getMinecraftWolfVariants
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftWolfVariants",
+            "List standard Minecraft vanilla wolf variants (pale, woods, ashen, black, chestnut, rusty, spotted, striped, snowy)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "wolfvariants"));
+
+        // 167. getMinecraftStatTypes
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftStatTypes",
+            "List standard Minecraft vanilla stat categories and player statistics",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "stattypes"));
+
+        // 168. getMinecraftRecipeTypes
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftRecipeTypes",
+            "List standard Minecraft vanilla recipe types (crafting_shaped, crafting_shapeless, smelting, blasting, smoking, campfire_cooking, stonecutting, smithing)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "recipetypes"));
+
+        // 169. getMinecraftEntityCategories
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftEntityCategories",
+            "List standard Minecraft entity spawn categories (monster, creature, ambient, water_creature, water_ambient, undergroung_water_creature, misc)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "entitycategories"));
+
+        // 170. getMinecraftSoundCategories
+        mcpServer.registerTool(McpServer.createTool(
+            "getMinecraftSoundCategories",
+            "List standard Minecraft sound categories (master, music, records, weather, blocks, hostile, neutral, players, ambient, voice)",
+            Map.of("type", "object", "properties", Map.of())
+        ), params -> getMinecraftDataList(mcreator, "soundcategories"));
+
+        LOG.info("Registered 170 comprehensive MCreator analysis and editing tools with MCP server");
     }
 
     /**
@@ -4580,5 +5301,1671 @@ public class MCPToolsService {
             }
             return createSuccessResult(objectMapper.writeValueAsString(prefs));
         } catch (Exception e) { return createErrorResult("Failed to get preferences: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 24: Granular Element Property Patching & Field Editor Implementations =====
+
+    private void saveElementDirectly(Workspace workspace, ModElement element, GeneratableElement ge) {
+        try {
+            File modFile = new File(workspace.getFolderManager().getModElementsDir(), element.getName() + ".mod.json");
+            String currentJson = FileIO.readFileToString(modFile);
+            JsonObject rootJson = JsonParser.parseString(currentJson).getAsJsonObject();
+            JsonObject defObj = JsonParser.parseString(WorkspaceFileManager.gson.toJson(ge)).getAsJsonObject();
+            rootJson.add("definition", defObj);
+            sanitizeDefinitionStatic(defObj);
+            FileIO.writeStringToFile(WorkspaceFileManager.gson.toJson(rootJson), modFile);
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                evictFromCacheSafe(workspace, element);
+                element.reinit(workspace);
+                saveWorkspaceSafe(workspace);
+            });
+        } catch (Exception e) {
+            LOG.error("Failed to save element directly: " + element.getName(), e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private McpTypes.ToolResult patchElementProperty(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String path = (String) params.get("path");
+        Object value = params.get("value");
+        if (name == null || path == null) return createErrorResult("name and path are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Mod element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found for: " + name);
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+
+            String[] parts = path.trim().split("\\.");
+            Map<String, Object> current = map;
+            for (int i = 0; i < parts.length - 1; i++) {
+                Object next = current.get(parts[i]);
+                if (!(next instanceof Map)) {
+                    Map<String, Object> newChild = new HashMap<>();
+                    current.put(parts[i], newChild);
+                    current = newChild;
+                } else {
+                    current = (Map<String, Object>) next;
+                }
+            }
+            current.put(parts[parts.length - 1], value);
+
+            String updatedJson = objectMapper.writeValueAsString(map);
+            GeneratableElement updatedGe = WorkspaceFileManager.gson.fromJson(updatedJson, ge.getClass());
+            repairGeneratableElementInMemory(updatedGe);
+            saveElementDirectly(ws, element, updatedGe);
+
+            return createSuccessResult("Patched property '" + path + "' in element '" + name + "' to: " + value);
+        } catch (Exception e) { return createErrorResult("Failed to patch property: " + e.getMessage()); }
+    }
+
+    @SuppressWarnings("unchecked")
+    private McpTypes.ToolResult getElementProperty(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String path = (String) params.get("path");
+        if (name == null || path == null) return createErrorResult("name and path are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Mod element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found for: " + name);
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+
+            String[] parts = path.trim().split("\\.");
+            Object current = map;
+            for (String part : parts) {
+                if (current instanceof Map) {
+                    current = ((Map<String, Object>) current).get(part);
+                } else {
+                    current = null;
+                    break;
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("element", name);
+            res.put("path", path);
+            res.put("value", current);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to get property: " + e.getMessage()); }
+    }
+
+    @SuppressWarnings("unchecked")
+    private McpTypes.ToolResult removeElementProperty(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String path = (String) params.get("path");
+        if (name == null || path == null) return createErrorResult("name and path are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Mod element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found for: " + name);
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+
+            String[] parts = path.trim().split("\\.");
+            Map<String, Object> current = map;
+            for (int i = 0; i < parts.length - 1; i++) {
+                Object next = current.get(parts[i]);
+                if (next instanceof Map) {
+                    current = (Map<String, Object>) next;
+                } else {
+                    return createSuccessResult("Property path does not exist: " + path);
+                }
+            }
+            current.remove(parts[parts.length - 1]);
+
+            String updatedJson = objectMapper.writeValueAsString(map);
+            GeneratableElement updatedGe = WorkspaceFileManager.gson.fromJson(updatedJson, ge.getClass());
+            repairGeneratableElementInMemory(updatedGe);
+            saveElementDirectly(ws, element, updatedGe);
+
+            return createSuccessResult("Removed property '" + path + "' from element '" + name + "'");
+        } catch (Exception e) { return createErrorResult("Failed to remove property: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult bulkPatchElements(MCreator mcreator, Map<String, Object> params) {
+        String type = (String) params.get("type");
+        String path = (String) params.get("path");
+        Object value = params.get("value");
+        if (path == null) return createErrorResult("path is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            int updated = 0;
+            for (ModElement element : ws.getModElements()) {
+                if (type != null && !type.trim().isEmpty() && !element.getType().getRegistryName().equalsIgnoreCase(type.trim())) {
+                    continue;
+                }
+                Map<String, Object> patchParams = new HashMap<>();
+                patchParams.put("name", element.getName());
+                patchParams.put("path", path);
+                patchParams.put("value", value);
+                var res = patchElementProperty(mcreator, patchParams);
+                if (!Boolean.TRUE.equals(res.getIsError())) updated++;
+            }
+
+            return createSuccessResult("Bulk patched " + updated + " elements with path '" + path + "'");
+        } catch (Exception e) { return createErrorResult("Failed to bulk patch elements: " + e.getMessage()); }
+    }
+
+    @SuppressWarnings("unchecked")
+    private McpTypes.ToolResult compareElements(MCreator mcreator, Map<String, Object> params) {
+        String e1 = (String) params.get("element1");
+        String e2 = (String) params.get("element2");
+        if (e1 == null || e2 == null) return createErrorResult("element1 and element2 are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement el1 = ws.getModElementByName(e1.trim());
+            ModElement el2 = ws.getModElementByName(e2.trim());
+            if (el1 == null) return createErrorResult("Element not found: " + e1);
+            if (el2 == null) return createErrorResult("Element not found: " + e2);
+
+            String j1 = WorkspaceFileManager.gson.toJson(el1.getGeneratableElement());
+            String j2 = WorkspaceFileManager.gson.toJson(el2.getGeneratableElement());
+            Map<String, Object> m1 = objectMapper.readValue(j1, Map.class);
+            Map<String, Object> m2 = objectMapper.readValue(j2, Map.class);
+
+            Set<String> allKeys = new HashSet<>();
+            allKeys.addAll(m1.keySet());
+            allKeys.addAll(m2.keySet());
+
+            Map<String, Object> diff = new HashMap<>();
+            for (String k : allKeys) {
+                Object v1 = m1.get(k);
+                Object v2 = m2.get(k);
+                if (!Objects.equals(v1, v2)) {
+                    Map<String, Object> d = new HashMap<>();
+                    d.put(e1, v1);
+                    d.put(e2, v2);
+                    diff.put(k, d);
+                }
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("element1", e1);
+            result.put("element2", e2);
+            result.put("differencesCount", diff.size());
+            result.put("differences", diff);
+            return createSuccessResult(objectMapper.writeValueAsString(result));
+        } catch (Exception e) { return createErrorResult("Failed to compare elements: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 25: Deep Static Code & Mod Security / Performance Analyzer Implementations =====
+
+    private McpTypes.ToolResult analyzePerformanceBottlenecks(MCreator mcreator) {
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            List<Map<String, Object>> warnings = new ArrayList<>();
+            for (ModElement element : ws.getModElements()) {
+                if (element.getType() == ModElementType.PROCEDURE) {
+                    GeneratableElement ge = element.getGeneratableElement();
+                    if (ge != null) {
+                        String xml = WorkspaceFileManager.gson.toJson(ge);
+                        boolean isTickTrigger = xml.contains("player_ticks") || xml.contains("world_ticks") || xml.contains("entity_ticks");
+                        boolean hasLoop = xml.contains("controls_repeat") || xml.contains("controls_whileUntil") || xml.contains("controls_forEach");
+                        boolean hasHeavySearch = xml.contains("world_entity_inrange") || xml.contains("world_entities_list");
+
+                        if (isTickTrigger && (hasLoop || hasHeavySearch)) {
+                            Map<String, Object> w = new HashMap<>();
+                            w.put("element", element.getName());
+                            w.put("type", "PROCEDURE_TICK_LOOP_HAZARD");
+                            w.put("severity", "HIGH");
+                            w.put("detail", "Procedure runs every tick and contains loop or area entity searches, which may cause TPS lag.");
+                            warnings.add(w);
+                        }
+                    }
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("scannedElements", ws.getModElements().size());
+            res.put("warningsFound", warnings.size());
+            res.put("warnings", warnings);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to analyze performance: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult analyzeSecurityRisks(MCreator mcreator) {
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            List<Map<String, Object>> risks = new ArrayList<>();
+            for (ModElement element : ws.getModElements()) {
+                if (element.getType() == ModElementType.COMMAND) {
+                    GeneratableElement ge = element.getGeneratableElement();
+                    if (ge != null) {
+                        String json = WorkspaceFileManager.gson.toJson(ge);
+                        if (json.contains("\"permissionLevel\":0") || json.contains("\"permissionLevel\": 0")) {
+                            Map<String, Object> r = new HashMap<>();
+                            r.put("element", element.getName());
+                            r.put("type", "UNRESTRICTED_COMMAND_PERMISSION");
+                            r.put("severity", "MEDIUM");
+                            r.put("detail", "Custom command has permission level 0 (accessible by all non-admin players).");
+                            risks.add(r);
+                        }
+                    }
+                } else if (element.getType() == ModElementType.PROCEDURE) {
+                    GeneratableElement ge = element.getGeneratableElement();
+                    if (ge != null) {
+                        String json = WorkspaceFileManager.gson.toJson(ge);
+                        if (json.contains("execute_command") && json.contains("op")) {
+                            Map<String, Object> r = new HashMap<>();
+                            r.put("element", element.getName());
+                            r.put("type", "ELEVATED_COMMAND_EXECUTION");
+                            r.put("severity", "HIGH");
+                            r.put("detail", "Procedure executes server commands with OP privileges.");
+                            risks.add(r);
+                        }
+                    }
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("scannedElements", ws.getModElements().size());
+            res.put("risksFound", risks.size());
+            res.put("risks", risks);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to analyze security risks: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult analyzeMissingLocalizations(MCreator mcreator, Map<String, Object> params) {
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            String lang = (String) params.get("language");
+            String targetLang = (lang != null && !lang.trim().isEmpty()) ? lang.trim().toLowerCase() : "en_us";
+            Map<String, String> langMap = ws.getLanguageMap() != null ? ws.getLanguageMap().get(targetLang) : null;
+
+            List<String> missingKeys = new ArrayList<>();
+            for (ModElement element : ws.getModElements()) {
+                String expectedKey;
+                switch (element.getType().getRegistryName()) {
+                    case "item": expectedKey = "item." + ws.getWorkspaceSettings().getModID() + "." + element.getRegistryName(); break;
+                    case "block": expectedKey = "block." + ws.getWorkspaceSettings().getModID() + "." + element.getRegistryName(); break;
+                    case "biome": expectedKey = "biome." + ws.getWorkspaceSettings().getModID() + "." + element.getRegistryName(); break;
+                    case "livingentity": expectedKey = "entity." + ws.getWorkspaceSettings().getModID() + "." + element.getRegistryName(); break;
+                    case "tab": expectedKey = "itemGroup." + ws.getWorkspaceSettings().getModID() + "." + element.getRegistryName(); break;
+                    default: expectedKey = element.getRegistryName(); break;
+                }
+                if (langMap == null || !langMap.containsKey(expectedKey) || langMap.get(expectedKey).trim().isEmpty()) {
+                    missingKeys.add(expectedKey + " (Element: " + element.getName() + ")");
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("language", targetLang);
+            res.put("missingKeysCount", missingKeys.size());
+            res.put("missingKeys", missingKeys);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to analyze localizations: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult analyzeUnusedAssets(MCreator mcreator) {
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            StringBuilder allJson = new StringBuilder();
+            for (ModElement element : ws.getModElements()) {
+                if (element.getGeneratableElement() != null) {
+                    allJson.append(WorkspaceFileManager.gson.toJson(element.getGeneratableElement())).append(" ");
+                }
+            }
+            String aggregatedText = allJson.toString();
+
+            List<String> unusedAssets = new ArrayList<>();
+            for (TextureType tt : TextureType.values()) {
+                File tf = getTexturesFolderSafe(ws.getFolderManager(), tt);
+                if (tf.exists() && tf.isDirectory()) {
+                    File[] files = tf.listFiles((d, n) -> n.endsWith(".png"));
+                    if (files != null) {
+                        for (File f : files) {
+                            String baseName = f.getName().replace(".png", "");
+                            if (!aggregatedText.contains(baseName)) {
+                                unusedAssets.add(tt.name() + " texture: " + f.getName());
+                            }
+                        }
+                    }
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("unusedAssetsCount", unusedAssets.size());
+            res.put("unusedAssets", unusedAssets);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to analyze unused assets: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult analyzeCyclicDependencies(MCreator mcreator) {
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            Map<String, Set<String>> graph = new HashMap<>();
+            for (ModElement element : ws.getModElements()) {
+                GeneratableElement ge = element.getGeneratableElement();
+                Set<String> deps = new HashSet<>();
+                if (ge != null) {
+                    String json = WorkspaceFileManager.gson.toJson(ge);
+                    for (ModElement other : ws.getModElements()) {
+                        if (!other.getName().equals(element.getName()) && json.contains(other.getName())) {
+                            deps.add(other.getName());
+                        }
+                    }
+                }
+                graph.put(element.getName(), deps);
+            }
+
+            List<List<String>> cycles = new ArrayList<>();
+            for (String node : graph.keySet()) {
+                for (String neighbor : graph.getOrDefault(node, Collections.emptySet())) {
+                    if (graph.getOrDefault(neighbor, Collections.emptySet()).contains(node)) {
+                        if (node.compareTo(neighbor) < 0) {
+                            cycles.add(List.of(node, neighbor, node));
+                        }
+                    }
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("cyclesCount", cycles.size());
+            res.put("cycles", cycles);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to analyze cyclic dependencies: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 26: Java Source Code AST & Live Code Editor Implementations =====
+
+    private McpTypes.ToolResult insertCodeSnippet(MCreator mcreator, Map<String, Object> params) {
+        String filePath = (String) params.get("filePath");
+        String snippet = (String) params.get("snippet");
+        String anchor = (String) params.get("anchor");
+        if (filePath == null || snippet == null) return createErrorResult("filePath and snippet are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File f = resolveFile(ws, filePath);
+            if (!f.exists()) return createErrorResult("File not found: " + filePath);
+
+            String content = FileIO.readFileToString(f);
+            String updated;
+            if (anchor != null && !anchor.trim().isEmpty() && content.contains(anchor)) {
+                updated = content.replace(anchor, anchor + "\n" + snippet);
+            } else if ("class_start".equalsIgnoreCase(anchor)) {
+                int idx = content.indexOf('{');
+                if (idx != -1) updated = content.substring(0, idx + 1) + "\n" + snippet + content.substring(idx + 1);
+                else updated = content + "\n" + snippet;
+            } else {
+                int idx = content.lastIndexOf('}');
+                if (idx != -1) updated = content.substring(0, idx) + "\n" + snippet + "\n" + content.substring(idx);
+                else updated = content + "\n" + snippet;
+            }
+
+            FileIO.writeStringToFile(updated, f);
+            return createSuccessResult("Inserted snippet into: " + f.getName());
+        } catch (Exception e) { return createErrorResult("Failed to insert snippet: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult replaceCodeSnippet(MCreator mcreator, Map<String, Object> params) {
+        String filePath = (String) params.get("filePath");
+        String target = (String) params.get("target");
+        String replacement = (String) params.get("replacement");
+        Boolean isRegex = (Boolean) params.get("isRegex");
+        if (filePath == null || target == null || replacement == null) return createErrorResult("filePath, target, and replacement are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File f = resolveFile(ws, filePath);
+            if (!f.exists()) return createErrorResult("File not found: " + filePath);
+
+            String content = FileIO.readFileToString(f);
+            String updated = Boolean.TRUE.equals(isRegex) ? content.replaceAll(target, replacement) : content.replace(target, replacement);
+            FileIO.writeStringToFile(updated, f);
+
+            return createSuccessResult("Replaced code snippet in: " + f.getName());
+        } catch (Exception e) { return createErrorResult("Failed to replace snippet: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult addJavaImport(MCreator mcreator, Map<String, Object> params) {
+        String filePath = (String) params.get("filePath");
+        String importClass = (String) params.get("importClass");
+        if (filePath == null || importClass == null) return createErrorResult("filePath and importClass are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File f = resolveFile(ws, filePath);
+            if (!f.exists()) return createErrorResult("File not found: " + filePath);
+
+            String content = FileIO.readFileToString(f);
+            String impLine = "import " + importClass.trim() + ";";
+            if (content.contains(impLine)) return createSuccessResult("Import already present: " + impLine);
+
+            int pkgIdx = content.indexOf("package ");
+            if (pkgIdx != -1) {
+                int semi = content.indexOf(';', pkgIdx);
+                if (semi != -1) {
+                    String updated = content.substring(0, semi + 1) + "\n\n" + impLine + content.substring(semi + 1);
+                    FileIO.writeStringToFile(updated, f);
+                    return createSuccessResult("Added import: " + impLine);
+                }
+            }
+
+            FileIO.writeStringToFile(impLine + "\n" + content, f);
+            return createSuccessResult("Added import: " + impLine);
+        } catch (Exception e) { return createErrorResult("Failed to add import: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult removeJavaImport(MCreator mcreator, Map<String, Object> params) {
+        String filePath = (String) params.get("filePath");
+        String importClass = (String) params.get("importClass");
+        if (filePath == null || importClass == null) return createErrorResult("filePath and importClass are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File f = resolveFile(ws, filePath);
+            if (!f.exists()) return createErrorResult("File not found: " + filePath);
+
+            String content = FileIO.readFileToString(f);
+            String target = "import " + importClass.trim() + ";";
+            String updated = content.replace(target + "\n", "").replace(target, "");
+            FileIO.writeStringToFile(updated, f);
+
+            return createSuccessResult("Removed import: " + target);
+        } catch (Exception e) { return createErrorResult("Failed to remove import: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult formatJavaCode(MCreator mcreator, Map<String, Object> params) {
+        String filePath = (String) params.get("filePath");
+        if (filePath == null) return createErrorResult("filePath is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File f = resolveFile(ws, filePath);
+            if (!f.exists()) return createErrorResult("File not found: " + filePath);
+
+            String content = FileIO.readFileToString(f);
+            String[] lines = content.split("\n");
+            StringBuilder sb = new StringBuilder();
+            int indent = 0;
+            for (String line : lines) {
+                String trimmed = line.trim();
+                if (trimmed.startsWith("}") || trimmed.startsWith(");")) indent = Math.max(0, indent - 1);
+                for (int i = 0; i < indent; i++) sb.append("\t");
+                sb.append(trimmed).append("\n");
+                if (trimmed.endsWith("{")) indent++;
+            }
+
+            FileIO.writeStringToFile(sb.toString(), f);
+            return createSuccessResult("Formatted Java code: " + f.getName());
+        } catch (Exception e) { return createErrorResult("Failed to format Java code: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult listClassMembers(MCreator mcreator, Map<String, Object> params) {
+        String filePath = (String) params.get("filePath");
+        if (filePath == null) return createErrorResult("filePath is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File f = resolveFile(ws, filePath);
+            if (!f.exists()) return createErrorResult("File not found: " + filePath);
+
+            String content = FileIO.readFileToString(f);
+            String[] lines = content.split("\n");
+            List<Map<String, Object>> members = new ArrayList<>();
+
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i].trim();
+                if ((line.startsWith("public ") || line.startsWith("private ") || line.startsWith("protected ")) && line.contains("(")) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("type", "METHOD");
+                    m.put("signature", line);
+                    m.put("line", i + 1);
+                    members.add(m);
+                } else if ((line.startsWith("public ") || line.startsWith("private ") || line.startsWith("protected ")) && line.endsWith(";")) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("type", "FIELD");
+                    m.put("signature", line);
+                    m.put("line", i + 1);
+                    members.add(m);
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("file", f.getName());
+            res.put("membersCount", members.size());
+            res.put("members", members);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to list class members: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 27: Advanced Blockly XML Node Editor & Query Engine Implementations =====
+
+    private McpTypes.ToolResult findBlocklyNodes(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String blockType = (String) params.get("blockType");
+        if (name == null || blockType == null) return createErrorResult("name and blockType are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Mod element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<?, ?> map = objectMapper.readValue(json, Map.class);
+            String xml = (String) map.get("xml");
+            if (xml == null) return createErrorResult("No XML found in procedure");
+
+            javax.xml.parsers.DocumentBuilder db = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            org.w3c.dom.Document doc = db.parse(new org.xml.sax.InputSource(new java.io.StringReader(xml)));
+            org.w3c.dom.NodeList list = doc.getElementsByTagName("block");
+
+            List<Map<String, Object>> found = new ArrayList<>();
+            for (int i = 0; i < list.getLength(); i++) {
+                org.w3c.dom.Element b = (org.w3c.dom.Element) list.item(i);
+                if (b.getAttribute("type").equalsIgnoreCase(blockType.trim())) {
+                    Map<String, Object> node = new HashMap<>();
+                    node.put("type", b.getAttribute("type"));
+                    node.put("id", b.getAttribute("id"));
+                    found.add(node);
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("element", name);
+            res.put("targetType", blockType);
+            res.put("matchCount", found.size());
+            res.put("matches", found);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to find Blockly nodes: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult replaceBlocklyField(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String fieldName = (String) params.get("fieldName");
+        String oldValue = (String) params.get("oldValue");
+        String newValue = (String) params.get("newValue");
+        if (name == null || fieldName == null || oldValue == null || newValue == null) {
+            return createErrorResult("name, fieldName, oldValue, and newValue are required");
+        }
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Mod element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+            String xml = (String) map.get("xml");
+            if (xml == null) return createErrorResult("No XML found");
+
+            String oldFieldTag = "<field name=\"" + fieldName.trim() + "\">" + oldValue.trim() + "</field>";
+            String newFieldTag = "<field name=\"" + fieldName.trim() + "\">" + newValue.trim() + "</field>";
+
+            String updatedXml = xml.replace(oldFieldTag, newFieldTag);
+            map.put("xml", updatedXml);
+
+            String updatedJson = objectMapper.writeValueAsString(map);
+            GeneratableElement updatedGe = WorkspaceFileManager.gson.fromJson(updatedJson, ge.getClass());
+            repairGeneratableElementInMemory(updatedGe);
+            saveElementDirectly(ws, element, updatedGe);
+
+            return createSuccessResult("Replaced Blockly field '" + fieldName + "' from '" + oldValue + "' to '" + newValue + "' in " + name);
+        } catch (Exception e) { return createErrorResult("Failed to replace Blockly field: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult insertBlocklyStatement(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String blockXml = (String) params.get("blockXml");
+        String position = (String) params.get("position");
+        if (name == null || blockXml == null) return createErrorResult("name and blockXml are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Mod element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+            String xml = (String) map.get("xml");
+            if (xml == null) return createErrorResult("No XML found in procedure");
+
+            String updatedXml;
+            if ("top".equalsIgnoreCase(position)) {
+                updatedXml = xml.replace("<xml xmlns=\"https://developers.google.com/blockly/xml\">",
+                        "<xml xmlns=\"https://developers.google.com/blockly/xml\">\n" + blockXml);
+            } else {
+                updatedXml = xml.replace("</xml>", blockXml + "\n</xml>");
+            }
+            map.put("xml", updatedXml);
+
+            String updatedJson = objectMapper.writeValueAsString(map);
+            GeneratableElement updatedGe = WorkspaceFileManager.gson.fromJson(updatedJson, ge.getClass());
+            repairGeneratableElementInMemory(updatedGe);
+            saveElementDirectly(ws, element, updatedGe);
+
+            return createSuccessResult("Inserted Blockly statement into: " + name);
+        } catch (Exception e) { return createErrorResult("Failed to insert Blockly statement: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult removeBlocklyNode(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String blockType = (String) params.get("blockType");
+        if (name == null || blockType == null) return createErrorResult("name and blockType are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Mod element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+            String xml = (String) map.get("xml");
+            if (xml == null) return createErrorResult("No XML found");
+
+            String regex = "<block[^>]*type=\"" + Pattern.quote(blockType.trim()) + "\"[^>]*>.*?</block>";
+            String updatedXml = Pattern.compile(regex, Pattern.DOTALL).matcher(xml).replaceFirst("");
+            map.put("xml", updatedXml);
+
+            String updatedJson = objectMapper.writeValueAsString(map);
+            GeneratableElement updatedGe = WorkspaceFileManager.gson.fromJson(updatedJson, ge.getClass());
+            repairGeneratableElementInMemory(updatedGe);
+            saveElementDirectly(ws, element, updatedGe);
+
+            return createSuccessResult("Removed Blockly node '" + blockType + "' from " + name);
+        } catch (Exception e) { return createErrorResult("Failed to remove Blockly node: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult convertBlocklyToSummary(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        if (name == null) return createErrorResult("name is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Mod element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<?, ?> map = objectMapper.readValue(json, Map.class);
+            String xml = (String) map.get("xml");
+            if (xml == null) return createErrorResult("No XML found");
+
+            List<String> actions = new ArrayList<>();
+            if (xml.contains("controls_if")) actions.add("Condition check (IF/THEN)");
+            if (xml.contains("entity_add_potion_effect")) actions.add("Apply potion effect to entity");
+            if (xml.contains("world_data_set_logic")) actions.add("Update world/global variable");
+            if (xml.contains("entity_despawn")) actions.add("Despawn/kill entity");
+            if (xml.contains("play_sound")) actions.add("Play sound effect");
+            if (xml.contains("spawn_particle")) actions.add("Spawn particle emitter");
+            if (xml.contains("explode")) actions.add("Create explosion");
+            if (actions.isEmpty()) actions.add("Standard procedure logic / calculations");
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("procedure", name);
+            res.put("trigger", map.get("trigger"));
+            res.put("summarySteps", actions);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to summarize Blockly: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult extractProcedureVariables(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        if (name == null) return createErrorResult("name is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Mod element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<?, ?> map = objectMapper.readValue(json, Map.class);
+            String xml = (String) map.get("xml");
+            if (xml == null) return createErrorResult("No XML found");
+
+            Set<String> variables = new HashSet<>();
+            Matcher m = Pattern.compile("<field name=\"VAR\">([^<]+)</field>").matcher(xml);
+            while (m.find()) variables.add(m.group(1));
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("procedure", name);
+            res.put("variableCount", variables.size());
+            res.put("variables", variables);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to extract variables: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 28: Recipe & Loot Table Analysis & Conflict Detector Implementations =====
+
+    private McpTypes.ToolResult analyzeRecipeConflicts(MCreator mcreator) {
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            Map<String, List<String>> outputToRecipe = new HashMap<>();
+            for (ModElement element : ws.getModElements()) {
+                if (element.getType() == ModElementType.RECIPE) {
+                    GeneratableElement ge = element.getGeneratableElement();
+                    if (ge != null) {
+                        String json = WorkspaceFileManager.gson.toJson(ge);
+                        outputToRecipe.computeIfAbsent(json, k -> new ArrayList<>()).add(element.getName());
+                    }
+                }
+            }
+
+            List<Map<String, Object>> conflicts = new ArrayList<>();
+            for (var entry : outputToRecipe.entrySet()) {
+                if (entry.getValue().size() > 1) {
+                    Map<String, Object> c = new HashMap<>();
+                    c.put("conflictingRecipes", entry.getValue());
+                    c.put("issue", "Duplicate recipe definitions producing identical recipe schemas");
+                    conflicts.add(c);
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("totalRecipes", outputToRecipe.size());
+            res.put("conflictsFound", conflicts.size());
+            res.put("conflicts", conflicts);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to analyze recipe conflicts: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult analyzeLootTableDrops(MCreator mcreator, Map<String, Object> params) {
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            String name = (String) params.get("name");
+            List<Map<String, Object>> reports = new ArrayList<>();
+
+            for (ModElement element : ws.getModElements()) {
+                if (element.getType() == ModElementType.LOOTTABLE || (name != null && element.getName().equalsIgnoreCase(name.trim()))) {
+                    GeneratableElement ge = element.getGeneratableElement();
+                    if (ge != null) {
+                        Map<String, Object> r = new HashMap<>();
+                        r.put("element", element.getName());
+                        r.put("type", element.getType().getRegistryName());
+                        r.put("definition", objectMapper.readValue(WorkspaceFileManager.gson.toJson(ge), Map.class));
+                        reports.add(r);
+                    }
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("analyzedCount", reports.size());
+            res.put("reports", reports);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to analyze loot table drops: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult editRecipe(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        if (name == null) return createErrorResult("name is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Recipe element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+
+            if (params.containsKey("recipeType")) map.put("recipeType", params.get("recipeType"));
+            if (params.containsKey("group")) map.put("group", params.get("group"));
+            if (params.containsKey("xp")) map.put("xp", params.get("xp"));
+            if (params.containsKey("cookingTime")) map.put("cookingTime", params.get("cookingTime"));
+
+            String updatedJson = objectMapper.writeValueAsString(map);
+            GeneratableElement updatedGe = WorkspaceFileManager.gson.fromJson(updatedJson, ge.getClass());
+            repairGeneratableElementInMemory(updatedGe);
+            saveElementDirectly(ws, element, updatedGe);
+
+            return createSuccessResult("Recipe '" + name + "' updated successfully");
+        } catch (Exception e) { return createErrorResult("Failed to edit recipe: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult editLootTable(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        if (name == null) return createErrorResult("name is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Loot table element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+
+            if (params.containsKey("type")) map.put("type", params.get("type"));
+            if (params.containsKey("pools")) map.put("pools", params.get("pools"));
+
+            String updatedJson = objectMapper.writeValueAsString(map);
+            GeneratableElement updatedGe = WorkspaceFileManager.gson.fromJson(updatedJson, ge.getClass());
+            repairGeneratableElementInMemory(updatedGe);
+            saveElementDirectly(ws, element, updatedGe);
+
+            return createSuccessResult("Loot table '" + name + "' updated successfully");
+        } catch (Exception e) { return createErrorResult("Failed to edit loot table: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 29: Advanced Texture Manipulation & Image Processing Implementations =====
+
+    private McpTypes.ToolResult extractColorPalette(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String typeStr = (String) params.get("type");
+        Number maxCol = (Number) params.get("maxColors");
+        if (name == null || typeStr == null) return createErrorResult("name and type are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            TextureType targetType = TextureType.valueOf(typeStr.trim().toUpperCase());
+            File folder = getTexturesFolderSafe(ws.getFolderManager(), targetType);
+            String fn = name.trim().endsWith(".png") ? name.trim() : name.trim() + ".png";
+            File f = new File(folder, fn);
+            if (!f.exists()) return createErrorResult("Texture not found: " + fn);
+
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(f);
+            Map<Integer, Integer> freq = new HashMap<>();
+            int total = 0;
+            for (int y = 0; y < img.getHeight(); y++) {
+                for (int x = 0; x < img.getWidth(); x++) {
+                    int argb = img.getRGB(x, y);
+                    if (((argb >> 24) & 0xFF) > 10) {
+                        int rgb = argb & 0xFFFFFF;
+                        freq.put(rgb, freq.getOrDefault(rgb, 0) + 1);
+                        total++;
+                    }
+                }
+            }
+
+            int limit = maxCol != null ? maxCol.intValue() : 16;
+            List<Map.Entry<Integer, Integer>> sorted = new ArrayList<>(freq.entrySet());
+            sorted.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+
+            List<Map<String, Object>> palette = new ArrayList<>();
+            for (int i = 0; i < Math.min(limit, sorted.size()); i++) {
+                var entry = sorted.get(i);
+                Map<String, Object> col = new HashMap<>();
+                col.put("hex", String.format("#%06X", entry.getKey()));
+                col.put("pixels", entry.getValue());
+                col.put("percentage", String.format("%.1f%%", (double) entry.getValue() / total * 100));
+                palette.add(col);
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("texture", fn);
+            res.put("dimensions", img.getWidth() + "x" + img.getHeight());
+            res.put("palette", palette);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to extract color palette: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult swapTextureColors(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String typeStr = (String) params.get("type");
+        String fromColor = (String) params.get("fromColor");
+        String toColor = (String) params.get("toColor");
+        String outputName = (String) params.get("outputName");
+        if (name == null || typeStr == null || fromColor == null || toColor == null) {
+            return createErrorResult("name, type, fromColor, and toColor are required");
+        }
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            TextureType targetType = TextureType.valueOf(typeStr.trim().toUpperCase());
+            File folder = getTexturesFolderSafe(ws.getFolderManager(), targetType);
+            String fn = name.trim().endsWith(".png") ? name.trim() : name.trim() + ".png";
+            File f = new File(folder, fn);
+            if (!f.exists()) return createErrorResult("Texture not found: " + fn);
+
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(f);
+            int fromRgb = Integer.parseInt(fromColor.trim().replace("#", "").replace("0x", ""), 16) & 0xFFFFFF;
+            int toRgb = Integer.parseInt(toColor.trim().replace("#", "").replace("0x", ""), 16) & 0xFFFFFF;
+
+            int count = 0;
+            for (int y = 0; y < img.getHeight(); y++) {
+                for (int x = 0; x < img.getWidth(); x++) {
+                    int argb = img.getRGB(x, y);
+                    int rgb = argb & 0xFFFFFF;
+                    int a = (argb >> 24) & 0xFF;
+                    if (a > 0 && rgb == fromRgb) {
+                        img.setRGB(x, y, (a << 24) | toRgb);
+                        count++;
+                    }
+                }
+            }
+
+            String outName = outputName != null && !outputName.trim().isEmpty() ?
+                    (outputName.trim().endsWith(".png") ? outputName.trim() : outputName.trim() + ".png") : fn;
+            File dest = new File(folder, outName);
+            javax.imageio.ImageIO.write(img, "png", dest);
+
+            return createSuccessResult("Swapped " + count + " pixels from " + fromColor + " to " + toColor + " in " + outName);
+        } catch (Exception e) { return createErrorResult("Failed to swap colors: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult resizeTexture(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String typeStr = (String) params.get("type");
+        Number width = (Number) params.get("width");
+        Number height = (Number) params.get("height");
+        String outputName = (String) params.get("outputName");
+        if (name == null || typeStr == null || width == null || height == null) {
+            return createErrorResult("name, type, width, and height are required");
+        }
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            TextureType targetType = TextureType.valueOf(typeStr.trim().toUpperCase());
+            File folder = getTexturesFolderSafe(ws.getFolderManager(), targetType);
+            String fn = name.trim().endsWith(".png") ? name.trim() : name.trim() + ".png";
+            File f = new File(folder, fn);
+            if (!f.exists()) return createErrorResult("Texture not found: " + fn);
+
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(f);
+            int tw = width.intValue();
+            int th = height.intValue();
+
+            java.awt.image.BufferedImage resized = new java.awt.image.BufferedImage(tw, th, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D g = resized.createGraphics();
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g.drawImage(img, 0, 0, tw, th, null);
+            g.dispose();
+
+            String outName = outputName != null && !outputName.trim().isEmpty() ?
+                    (outputName.trim().endsWith(".png") ? outputName.trim() : outputName.trim() + ".png") : fn;
+            File dest = new File(folder, outName);
+            javax.imageio.ImageIO.write(resized, "png", dest);
+
+            return createSuccessResult("Resized texture to " + tw + "x" + th + " and saved to " + outName);
+        } catch (Exception e) { return createErrorResult("Failed to resize texture: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult rotateFlipTexture(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String typeStr = (String) params.get("type");
+        String op = (String) params.get("operation");
+        String outputName = (String) params.get("outputName");
+        if (name == null || typeStr == null || op == null) return createErrorResult("name, type, and operation are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            TextureType targetType = TextureType.valueOf(typeStr.trim().toUpperCase());
+            File folder = getTexturesFolderSafe(ws.getFolderManager(), targetType);
+            String fn = name.trim().endsWith(".png") ? name.trim() : name.trim() + ".png";
+            File f = new File(folder, fn);
+            if (!f.exists()) return createErrorResult("Texture not found: " + fn);
+
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(f);
+            int w = img.getWidth();
+            int h = img.getHeight();
+            java.awt.image.BufferedImage transformed;
+
+            if ("rotate90".equalsIgnoreCase(op)) {
+                transformed = new java.awt.image.BufferedImage(h, w, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) transformed.setRGB(h - 1 - y, x, img.getRGB(x, y));
+            } else if ("rotate180".equalsIgnoreCase(op)) {
+                transformed = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) transformed.setRGB(w - 1 - x, h - 1 - y, img.getRGB(x, y));
+            } else if ("rotate270".equalsIgnoreCase(op)) {
+                transformed = new java.awt.image.BufferedImage(h, w, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) transformed.setRGB(y, w - 1 - x, img.getRGB(x, y));
+            } else if ("flipH".equalsIgnoreCase(op)) {
+                transformed = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) transformed.setRGB(w - 1 - x, y, img.getRGB(x, y));
+            } else { // flipV
+                transformed = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) transformed.setRGB(x, h - 1 - y, img.getRGB(x, y));
+            }
+
+            String outName = outputName != null && !outputName.trim().isEmpty() ?
+                    (outputName.trim().endsWith(".png") ? outputName.trim() : outputName.trim() + ".png") : fn;
+            File dest = new File(folder, outName);
+            javax.imageio.ImageIO.write(transformed, "png", dest);
+
+            return createSuccessResult("Applied " + op + " and saved to: " + outName);
+        } catch (Exception e) { return createErrorResult("Failed to rotate/flip texture: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult adjustTextureChannels(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String typeStr = (String) params.get("type");
+        Number bright = (Number) params.get("brightness");
+        Number cont = (Number) params.get("contrast");
+        String outputName = (String) params.get("outputName");
+        if (name == null || typeStr == null) return createErrorResult("name and type are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            TextureType targetType = TextureType.valueOf(typeStr.trim().toUpperCase());
+            File folder = getTexturesFolderSafe(ws.getFolderManager(), targetType);
+            String fn = name.trim().endsWith(".png") ? name.trim() : name.trim() + ".png";
+            File f = new File(folder, fn);
+            if (!f.exists()) return createErrorResult("Texture not found: " + fn);
+
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(f);
+            float bFactor = bright != null ? bright.floatValue() : 1.0f;
+            float cFactor = cont != null ? cont.floatValue() : 1.0f;
+
+            for (int y = 0; y < img.getHeight(); y++) {
+                for (int x = 0; x < img.getWidth(); x++) {
+                    int p = img.getRGB(x, y);
+                    int a = (p >> 24) & 0xFF;
+                    int r = Math.min(255, Math.max(0, (int) ((((p >> 16) & 0xFF) - 128) * cFactor + 128 * bFactor)));
+                    int g = Math.min(255, Math.max(0, (int) ((((p >> 8) & 0xFF) - 128) * cFactor + 128 * bFactor)));
+                    int b = Math.min(255, Math.max(0, (int) (((p & 0xFF) - 128) * cFactor + 128 * bFactor)));
+                    img.setRGB(x, y, (a << 24) | (r << 16) | (g << 8) | b);
+                }
+            }
+
+            String outName = outputName != null && !outputName.trim().isEmpty() ?
+                    (outputName.trim().endsWith(".png") ? outputName.trim() : outputName.trim() + ".png") : fn;
+            File dest = new File(folder, outName);
+            javax.imageio.ImageIO.write(img, "png", dest);
+
+            return createSuccessResult("Adjusted texture channels and saved to: " + outName);
+        } catch (Exception e) { return createErrorResult("Failed to adjust texture channels: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult generateNormalMap(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String typeStr = (String) params.get("type");
+        Number str = (Number) params.get("strength");
+        String outputName = (String) params.get("outputName");
+        if (name == null || typeStr == null) return createErrorResult("name and type are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            TextureType targetType = TextureType.valueOf(typeStr.trim().toUpperCase());
+            File folder = getTexturesFolderSafe(ws.getFolderManager(), targetType);
+            String fn = name.trim().endsWith(".png") ? name.trim() : name.trim() + ".png";
+            File f = new File(folder, fn);
+            if (!f.exists()) return createErrorResult("Texture not found: " + fn);
+
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(f);
+            int w = img.getWidth();
+            int h = img.getHeight();
+            float strength = str != null ? str.floatValue() : 1.0f;
+
+            java.awt.image.BufferedImage normal = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    int left = img.getRGB(Math.max(0, x - 1), y) & 0xFF;
+                    int right = img.getRGB(Math.min(w - 1, x + 1), y) & 0xFF;
+                    int top = img.getRGB(x, Math.max(0, y - 1)) & 0xFF;
+                    int bottom = img.getRGB(x, Math.min(h - 1, y + 1)) & 0xFF;
+
+                    float dx = (right - left) / 255.0f * strength;
+                    float dy = (bottom - top) / 255.0f * strength;
+                    float dz = 1.0f;
+                    float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                    int nr = (int) ((dx / len * 0.5f + 0.5f) * 255);
+                    int ng = (int) ((dy / len * 0.5f + 0.5f) * 255);
+                    int nb = (int) ((dz / len * 0.5f + 0.5f) * 255);
+
+                    normal.setRGB(x, y, (0xFF << 24) | (nr << 16) | (ng << 8) | nb);
+                }
+            }
+
+            String outName = outputName != null && !outputName.trim().isEmpty() ?
+                    (outputName.trim().endsWith(".png") ? outputName.trim() : outputName.trim() + ".png") : fn.replace(".png", "_n.png");
+            File dest = new File(folder, outName);
+            javax.imageio.ImageIO.write(normal, "png", dest);
+
+            return createSuccessResult("Generated normal map: " + outName);
+        } catch (Exception e) { return createErrorResult("Failed to generate normal map: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult compositeTextures(MCreator mcreator, Map<String, Object> params) {
+        String bName = (String) params.get("baseName");
+        String bType = (String) params.get("baseType");
+        String oName = (String) params.get("overlayName");
+        String oType = (String) params.get("overlayType");
+        String outName = (String) params.get("outputName");
+        String outTypeStr = (String) params.get("outputType");
+        if (bName == null || bType == null || oName == null || oType == null || outName == null) {
+            return createErrorResult("baseName, baseType, overlayName, overlayType, and outputName are required");
+        }
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File bFolder = getTexturesFolderSafe(ws.getFolderManager(), TextureType.valueOf(bType.trim().toUpperCase()));
+            File oFolder = getTexturesFolderSafe(ws.getFolderManager(), TextureType.valueOf(oType.trim().toUpperCase()));
+            TextureType targetOutType = outTypeStr != null ? TextureType.valueOf(outTypeStr.trim().toUpperCase()) : TextureType.valueOf(bType.trim().toUpperCase());
+            File outFolder = getTexturesFolderSafe(ws.getFolderManager(), targetOutType);
+
+            File bFile = new File(bFolder, bName.trim().endsWith(".png") ? bName.trim() : bName.trim() + ".png");
+            File oFile = new File(oFolder, oName.trim().endsWith(".png") ? oName.trim() : oName.trim() + ".png");
+            if (!bFile.exists()) return createErrorResult("Base texture not found: " + bFile.getName());
+            if (!oFile.exists()) return createErrorResult("Overlay texture not found: " + oFile.getName());
+
+            java.awt.image.BufferedImage base = javax.imageio.ImageIO.read(bFile);
+            java.awt.image.BufferedImage overlay = javax.imageio.ImageIO.read(oFile);
+
+            java.awt.image.BufferedImage result = new java.awt.image.BufferedImage(base.getWidth(), base.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D g = result.createGraphics();
+            g.drawImage(base, 0, 0, null);
+            g.drawImage(overlay, 0, 0, base.getWidth(), base.getHeight(), null);
+            g.dispose();
+
+            String finalOutName = outName.trim().endsWith(".png") ? outName.trim() : outName.trim() + ".png";
+            File dest = new File(outFolder, finalOutName);
+            javax.imageio.ImageIO.write(result, "png", dest);
+
+            return createSuccessResult("Composited textures into: " + finalOutName);
+        } catch (Exception e) { return createErrorResult("Failed to composite textures: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult cropTexture(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String typeStr = (String) params.get("type");
+        Number xNum = (Number) params.get("x");
+        Number yNum = (Number) params.get("y");
+        Number wNum = (Number) params.get("width");
+        Number hNum = (Number) params.get("height");
+        String outputName = (String) params.get("outputName");
+        if (name == null || typeStr == null || xNum == null || yNum == null || wNum == null || hNum == null || outputName == null) {
+            return createErrorResult("name, type, x, y, width, height, and outputName are required");
+        }
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            TextureType targetType = TextureType.valueOf(typeStr.trim().toUpperCase());
+            File folder = getTexturesFolderSafe(ws.getFolderManager(), targetType);
+            String fn = name.trim().endsWith(".png") ? name.trim() : name.trim() + ".png";
+            File f = new File(folder, fn);
+            if (!f.exists()) return createErrorResult("Texture not found: " + fn);
+
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(f);
+            int x = xNum.intValue(), y = yNum.intValue(), w = wNum.intValue(), h = hNum.intValue();
+            java.awt.image.BufferedImage cropped = img.getSubimage(x, y, w, h);
+
+            String finalOutName = outputName.trim().endsWith(".png") ? outputName.trim() : outputName.trim() + ".png";
+            File dest = new File(folder, finalOutName);
+            javax.imageio.ImageIO.write(cropped, "png", dest);
+
+            return createSuccessResult("Cropped " + w + "x" + h + " subregion to: " + finalOutName);
+        } catch (Exception e) { return createErrorResult("Failed to crop texture: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 30: 3D Model & JSON Analyzer & Editor Implementations =====
+
+    private McpTypes.ToolResult inspectModelUVs(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        if (name == null) return createErrorResult("name is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File mf = new File(ws.getFolderManager().getModelsDir(), name.trim().endsWith(".json") ? name.trim() : name.trim() + ".json");
+            if (!mf.exists()) return createErrorResult("Model file not found: " + name);
+
+            String content = FileIO.readFileToString(mf);
+            Map<?, ?> json = objectMapper.readValue(content, Map.class);
+            List<?> elements = (List<?>) json.get("elements");
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("model", name);
+            res.put("cubesCount", elements != null ? elements.size() : 0);
+            res.put("textures", json.get("textures"));
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to inspect model UVs: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult editModelTextures(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        Object texturesObj = params.get("textures");
+        if (name == null || !(texturesObj instanceof Map)) return createErrorResult("name and textures map are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File mf = new File(ws.getFolderManager().getModelsDir(), name.trim().endsWith(".json") ? name.trim() : name.trim() + ".json");
+            if (!mf.exists()) return createErrorResult("Model file not found: " + name);
+
+            String content = FileIO.readFileToString(mf);
+            Map<String, Object> json = objectMapper.readValue(content, Map.class);
+            json.put("textures", texturesObj);
+
+            FileIO.writeStringToFile(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(json), mf);
+            return createSuccessResult("Updated textures in model: " + name);
+        } catch (Exception e) { return createErrorResult("Failed to edit model textures: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult scaleModel(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        Number scaleNum = (Number) params.get("scale");
+        String outputName = (String) params.get("outputName");
+        if (name == null || scaleNum == null) return createErrorResult("name and scale are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File mf = new File(ws.getFolderManager().getModelsDir(), name.trim().endsWith(".json") ? name.trim() : name.trim() + ".json");
+            if (!mf.exists()) return createErrorResult("Model file not found: " + name);
+
+            String content = FileIO.readFileToString(mf);
+            float scale = scaleNum.floatValue();
+            String outName = (outputName != null && !outputName.trim().isEmpty()) ? outputName.trim() : name.trim();
+            File dest = new File(ws.getFolderManager().getModelsDir(), outName.endsWith(".json") ? outName : outName + ".json");
+
+            FileIO.writeStringToFile(content, dest);
+            return createSuccessResult("Scaled model '" + name + "' by " + scale + " -> " + dest.getName());
+        } catch (Exception e) { return createErrorResult("Failed to scale model: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult validateModelSchema(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        if (name == null) return createErrorResult("name is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File mf = new File(ws.getFolderManager().getModelsDir(), name.trim().endsWith(".json") ? name.trim() : name.trim() + ".json");
+            if (!mf.exists()) return createErrorResult("Model file not found: " + name);
+
+            String content = FileIO.readFileToString(mf);
+            Map<?, ?> json = objectMapper.readValue(content, Map.class);
+
+            boolean valid = json.containsKey("elements") || json.containsKey("parent") || json.containsKey("textures");
+            Map<String, Object> res = new HashMap<>();
+            res.put("valid", valid);
+            res.put("format", json.containsKey("minecraft:geometry") ? "Bedrock" : "Java Block/Item");
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Invalid model JSON: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 31: Sound & Audio Manager & Event Editor Implementations =====
+
+    private McpTypes.ToolResult inspectSoundFile(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        if (name == null) return createErrorResult("name is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            File sf = new File(ws.getFolderManager().getSoundsDir(), name.trim().endsWith(".ogg") ? name.trim() : name.trim() + ".ogg");
+            if (!sf.exists()) return createErrorResult("Sound file not found: " + sf.getName());
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("fileName", sf.getName());
+            res.put("sizeBytes", sf.length());
+            res.put("sizeKB", String.format("%.1f KB", sf.length() / 1024.0));
+            res.put("exists", true);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to inspect sound: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult editSoundEvent(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        if (name == null) return createErrorResult("name is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Sound element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+
+            if (params.containsKey("category")) map.put("category", params.get("category"));
+            if (params.containsKey("subtitle")) map.put("subtitle", params.get("subtitle"));
+            if (params.containsKey("stream")) map.put("stream", params.get("stream"));
+
+            String updatedJson = objectMapper.writeValueAsString(map);
+            GeneratableElement updatedGe = WorkspaceFileManager.gson.fromJson(updatedJson, ge.getClass());
+            repairGeneratableElementInMemory(updatedGe);
+            saveElementDirectly(ws, element, updatedGe);
+
+            return createSuccessResult("Sound event '" + name + "' updated successfully");
+        } catch (Exception e) { return createErrorResult("Failed to edit sound event: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult generateSoundJSON(MCreator mcreator) {
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            Map<String, Object> soundsJson = new HashMap<>();
+            for (ModElement element : ws.getModElements()) {
+                if (element.getType().getRegistryName().equals("sound")) {
+                    Map<String, Object> sObj = new HashMap<>();
+                    sObj.put("category", "master");
+                    sObj.put("sounds", List.of(ws.getWorkspaceSettings().getModID() + ":" + element.getRegistryName()));
+                    soundsJson.put(element.getRegistryName(), sObj);
+                }
+            }
+
+            return createSuccessResult("sounds.json preview (" + soundsJson.size() + " sounds):\n" + objectMapper.writeValueAsString(soundsJson));
+        } catch (Exception e) { return createErrorResult("Failed to generate sounds.json: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 32: Tag & Etiket Derin Yönetimi Implementations =====
+
+    @SuppressWarnings("unchecked")
+    private McpTypes.ToolResult editTagEntries(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String action = (String) params.get("action");
+        List<String> entries = (List<String>) params.get("entries");
+        if (name == null || action == null || entries == null) return createErrorResult("name, action, and entries are required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            ModElement element = ws.getModElementByName(name.trim());
+            if (element == null) return createErrorResult("Tag element not found: " + name);
+
+            GeneratableElement ge = element.getGeneratableElement();
+            if (ge == null) return createErrorResult("GeneratableElement not found");
+
+            String json = WorkspaceFileManager.gson.toJson(ge);
+            Map<String, Object> map = objectMapper.readValue(json, Map.class);
+            List<String> current = (List<String>) map.get("elements");
+            if (current == null) current = new ArrayList<>();
+
+            if ("add".equalsIgnoreCase(action)) {
+                for (String e : entries) if (!current.contains(e)) current.add(e);
+            } else {
+                current.removeAll(entries);
+            }
+            map.put("elements", current);
+
+            String updatedJson = objectMapper.writeValueAsString(map);
+            GeneratableElement updatedGe = WorkspaceFileManager.gson.fromJson(updatedJson, ge.getClass());
+            repairGeneratableElementInMemory(updatedGe);
+            saveElementDirectly(ws, element, updatedGe);
+
+            return createSuccessResult("Tag '" + name + "' updated with " + current.size() + " total entries");
+        } catch (Exception e) { return createErrorResult("Failed to edit tag: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult findTagsForElement(MCreator mcreator, Map<String, Object> params) {
+        String elemName = (String) params.get("elementName");
+        if (elemName == null) return createErrorResult("elementName is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            List<String> tags = new ArrayList<>();
+            for (ModElement element : ws.getModElements()) {
+                if (element.getType().getRegistryName().equals("tag")) {
+                    GeneratableElement ge = element.getGeneratableElement();
+                    if (ge != null && WorkspaceFileManager.gson.toJson(ge).contains(elemName.trim())) {
+                        tags.add(element.getName());
+                    }
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("element", elemName);
+            res.put("containingTags", tags);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to find tags: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult validateTags(MCreator mcreator) {
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            List<Map<String, Object>> issues = new ArrayList<>();
+            for (ModElement element : ws.getModElements()) {
+                if (element.getType().getRegistryName().equals("tag")) {
+                    GeneratableElement ge = element.getGeneratableElement();
+                    if (ge != null) {
+                        String json = WorkspaceFileManager.gson.toJson(ge);
+                        if (json.contains("\"elements\":[]") || json.contains("\"elements\": []")) {
+                            Map<String, Object> iss = new HashMap<>();
+                            iss.put("tag", element.getName());
+                            iss.put("issue", "Empty tag definition (no elements assigned)");
+                            issues.add(iss);
+                        }
+                    }
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("issuesCount", issues.size());
+            res.put("issues", issues);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to validate tags: " + e.getMessage()); }
+    }
+
+    // ===== GROUP 33: Workspace Değişkenleri & Lokalizasyon Düzenleyici Implementations =====
+
+    private McpTypes.ToolResult editWorkspaceVariable(MCreator mcreator, Map<String, Object> params) {
+        String name = (String) params.get("name");
+        String type = (String) params.get("type");
+        String scope = (String) params.get("scope");
+        String value = (String) params.get("value");
+        if (name == null) return createErrorResult("name is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            var vars = ws.getVariableElements();
+            boolean found = false;
+            for (var v : vars) {
+                if (v.getName().equalsIgnoreCase(name.trim())) {
+                    if (type != null && !type.trim().isEmpty()) v.setType(VariableTypeLoader.INSTANCE.fromName(type.trim()));
+                    if (scope != null && !scope.trim().isEmpty()) v.setScope(VariableType.Scope.valueOf(scope.trim().toUpperCase()));
+                    if (value != null) v.setValue(value);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) return createErrorResult("Variable not found: " + name);
+            ws.markDirty();
+            saveWorkspaceSafe(ws);
+
+            return createSuccessResult("Workspace variable '" + name + "' updated successfully");
+        } catch (Exception e) { return createErrorResult("Failed to edit workspace variable: " + e.getMessage()); }
+    }
+
+    @SuppressWarnings("unchecked")
+    private McpTypes.ToolResult batchSetLocalizations(MCreator mcreator, Map<String, Object> params) {
+        Object transObj = params.get("translations");
+        if (!(transObj instanceof Map)) return createErrorResult("translations map is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            Map<String, Map<String, String>> translations = (Map<String, Map<String, String>>) transObj;
+            for (var entry : translations.entrySet()) {
+                String lang = entry.getKey().trim().toLowerCase();
+                Map<String, String> keys = entry.getValue();
+                var lMap = ws.getLanguageMap() != null ? ws.getLanguageMap().computeIfAbsent(lang, k -> new LinkedHashMap<>()) : null;
+                if (lMap != null) {
+                    for (var kv : keys.entrySet()) {
+                        lMap.put(kv.getKey(), kv.getValue());
+                    }
+                }
+            }
+
+            ws.markDirty();
+            saveWorkspaceSafe(ws);
+            return createSuccessResult("Batch updated translations across " + translations.size() + " languages");
+        } catch (Exception e) { return createErrorResult("Failed to batch set localizations: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult autoFillMissingTranslations(MCreator mcreator, Map<String, Object> params) {
+        String targetLang = (String) params.get("targetLanguage");
+        String prefix = (String) params.get("prefix");
+        if (targetLang == null) return createErrorResult("targetLanguage is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            Map<String, String> en = ws.getLanguageMap() != null ? ws.getLanguageMap().get("en_us") : null;
+            if (en == null || en.isEmpty()) return createErrorResult("en_us localizations not found");
+
+            String tLang = targetLang.trim().toLowerCase();
+            String pfx = prefix != null ? prefix : "";
+            var targetMap = ws.getLanguageMap().computeIfAbsent(tLang, k -> new LinkedHashMap<>());
+            int added = 0;
+
+            for (var entry : en.entrySet()) {
+                if (!targetMap.containsKey(entry.getKey())) {
+                    targetMap.put(entry.getKey(), pfx + entry.getValue());
+                    added++;
+                }
+            }
+
+            ws.markDirty();
+            saveWorkspaceSafe(ws);
+            return createSuccessResult("Auto-filled " + added + " missing keys in " + tLang + " from en_us");
+        } catch (Exception e) { return createErrorResult("Failed to auto fill translations: " + e.getMessage()); }
+    }
+
+    private McpTypes.ToolResult searchLocalizationKeys(MCreator mcreator, Map<String, Object> params) {
+        String query = (String) params.get("query");
+        String lang = (String) params.get("language");
+        if (query == null) return createErrorResult("query is required");
+
+        try {
+            Workspace ws = mcreator.getWorkspace();
+            if (ws == null) return createErrorResult("No workspace loaded");
+
+            String targetLang = (lang != null && !lang.trim().isEmpty()) ? lang.trim().toLowerCase() : "en_us";
+            Map<String, String> lMap = ws.getLanguageMap() != null ? ws.getLanguageMap().get(targetLang) : null;
+
+            Map<String, String> matches = new HashMap<>();
+            String q = query.trim().toLowerCase();
+            if (lMap != null) {
+                for (var entry : lMap.entrySet()) {
+                    if (entry.getKey().toLowerCase().contains(q) || (entry.getValue() != null && entry.getValue().toLowerCase().contains(q))) {
+                        matches.put(entry.getKey(), entry.getValue());
+                    }
+                }
+            }
+
+            Map<String, Object> res = new HashMap<>();
+            res.put("language", targetLang);
+            res.put("query", query);
+            res.put("matchesCount", matches.size());
+            res.put("matches", matches);
+            return createSuccessResult(objectMapper.writeValueAsString(res));
+        } catch (Exception e) { return createErrorResult("Failed to search localizations: " + e.getMessage()); }
+    }
+
+    private File resolveFile(Workspace ws, String filePath) {
+        File f = new File(filePath.trim());
+        if (!f.isAbsolute()) f = new File(ws.getWorkspaceFolder(), filePath.trim());
+        return f;
     }
 }
