@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "mcreator": {
+      "serverUrl": "http://localhost:5175/mcp/sse"
+    }
+  }
+}

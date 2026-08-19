@@ -1,0 +1,84 @@
+* {
+    font-family: sans-serif;
+}
+
+::-webkit-scrollbar {
+    width: 7px;
+}
+
+.blocklyScrollbarBackground {
+    opacity: 255;
+    fill: transparent;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+#toolbox {
+    display: none;
+}
+
+#blockly {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+}
+
+.blocklyTreeLabel {
+    font-family: sans-serif;
+    font-size: 13px;
+}
+
+.blocklyText {
+    font-family: sans-serif;
+}
+
+.blocklyMainBackground {
+    stroke-width: 0;
+}
+
+.blocklyFlyoutBackground {
+    fill-opacity: 0;
+}
+
+.blocklyScrollbarVertical .blocklyScrollbarHandle {
+    rx: 3;
+    ry: 3;
+    width: 6px;
+}
+
+.blocklyScrollbarHorizontal .blocklyScrollbarHandle {
+    rx: 3;
+    ry: 3;
+    height: 6px;
+}
+
+.blocklySelected > .blocklyPath {
+    stroke-width: 2px;
+}
+
+.whlab > .blocklyFlyoutLabelText {
+    font-family: sans-serif;
+    font-size: 14px;
+}
+
+.small-text {
+    font-size: 12px !important;
+}
+
+.blocklyWidgetDiv .goog-menu {
+    border-radius: 0;
+}
+
+.condition-label {
+    font-size: 13px !important;
+}
+
+.blocklyDropDownContent {
+    position: relative;
+}

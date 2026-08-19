@@ -1,0 +1,90 @@
+import groovy.json.JsonSlurper
+
+import org.gradle.api.file.DuplicatesStrategy
+
+plugins {
+    id "java"
+}
+
+repositories {
+    mavenCentral()
+    maven { url "https://repo.gradle.org/gradle/libs-releases" } // for gradle-tooling-api
+    flatDir { dirs mcreator_path + '/lib' }
+}
+
+group = 'net.mcreator.MCreatorMCP'
+version = new JsonSlurper().parse(file('src/main/resources/plugin.json'))['info']['version']
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+configurations {
+    implementation.extendsFrom export
+}
+
+dependencies {
+    implementation project(':MCreator')
+
+    project(':MCreator').afterEvaluate {
+        project(":MCreator").configurations.named("implementation").get().dependencies.each {
+            //noinspection ForeignDelegate
+            implementation it
+        }
+    }
+
+    // JSON processing for MCP server
+    export group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.16.1'
+    export group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.16.1'
+    export group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.16.1'
+
+    // Testing dependencies
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+
+    // Use "export" configuration for dependencies that should be included in the plugin (if MCreator does not provide them)
+    // export group: 'org.example', name: 'example-library', version: '1.2.3'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.jar {
+    archiveFileName.set("MCreatorMCP.zip")
+
+    // Handle duplicate files
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // include normal exported deps (Jackson for JSON processing)
+    from { configurations.export.collect { it.isDirectory() ? it : zipTree(it) } }
+}
+
+tasks.register('runMCreatorWithPlugin', JavaExec) {
+    dependsOn jar
+
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+
+    environment("MCREATOR_PLUGINS_FOLDER", file("./build/libs"))
+    environment("MCREATOR_PLUGINS_DEV", "")
+
+    jvmArgs '--add-opens', 'java.base/java.lang=ALL-UNNAMED'
+
+    classpath = project(':MCreator').sourceSets.main.runtimeClasspath
+
+    mainClass.set('net.mcreator.Launcher')
+
+    workingDir = mcreator_path
+}
+
+subprojects { subproject ->
+    subproject.plugins.withType(JavaPlugin) {
+        test {
+            environment("MCREATOR_PLUGINS_FOLDER", new File(rootProject.projectDir, "/build/libs"))
+            environment("MCREATOR_PLUGINS_DEV", "")
+
+            workingDir = mcreator_path
+        }
+    }
+}
