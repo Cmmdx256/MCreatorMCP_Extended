@@ -185,6 +185,33 @@ public class McpServer {
         return null; // Notifications don't return values
     }
 
+    private static final ObjectMapper STATIC_OBJECT_MAPPER = new ObjectMapper();
+    private static final Set<String> HIGH_LEVEL_TOOL_NAMES = new HashSet<>(Arrays.asList(
+            "analyze_project", "inspect_project", "execute_task", "modify_project",
+            "create_element", "validate_project", "get_project_context", "get_live_context", "manage_tool_mode"
+    ));
+    private volatile String toolMode = "DUAL_HYBRID";
+
+    public static String toJsonStringStatic(Object obj) {
+        if (obj == null) return "{}";
+        try {
+            return STATIC_OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
+        } catch (Exception e) {
+            return String.valueOf(obj);
+        }
+    }
+
+    public void setToolMode(String mode) {
+        if (mode != null) {
+            this.toolMode = mode;
+            LOG.info("MCP toolMode updated to: {}", mode);
+        }
+    }
+
+    public String getToolMode() {
+        return toolMode;
+    }
+
     private final Map<String, McpTypes.Tool> registeredTools = new java.util.concurrent.ConcurrentHashMap<>();
 
     public void registerTool(McpTypes.Tool tool, McpHandler handler) {
@@ -201,14 +228,40 @@ public class McpServer {
      * Handle tools/list request
      */
     private Map<String, Object> handleToolsList(Map<String, Object> params) {
-        LOG.debug("Handling tools/list request");
+        LOG.debug("Handling tools/list request with mode: {}", toolMode);
         
-        List<McpTypes.Tool> tools = new ArrayList<>(registeredTools.values());
+        List<McpTypes.Tool> tools = new ArrayList<>();
+        if ("HIGH_LEVEL_ONLY".equalsIgnoreCase(toolMode)) {
+            for (McpTypes.Tool t : registeredTools.values()) {
+                if (HIGH_LEVEL_TOOL_NAMES.contains(t.getName())) {
+                    tools.add(t);
+                }
+            }
+        } else if ("LEGACY_FULL".equalsIgnoreCase(toolMode)) {
+            for (McpTypes.Tool t : registeredTools.values()) {
+                if (!HIGH_LEVEL_TOOL_NAMES.contains(t.getName())) {
+                    tools.add(t);
+                }
+            }
+        } else {
+            // DUAL_HYBRID: Put high level tools first, then low-level tools
+            List<McpTypes.Tool> highLevel = new ArrayList<>();
+            List<McpTypes.Tool> lowLevel = new ArrayList<>();
+            for (McpTypes.Tool t : registeredTools.values()) {
+                if (HIGH_LEVEL_TOOL_NAMES.contains(t.getName())) {
+                    highLevel.add(t);
+                } else {
+                    lowLevel.add(t);
+                }
+            }
+            tools.addAll(highLevel);
+            tools.addAll(lowLevel);
+        }
         
         Map<String, Object> response = new HashMap<>();
         response.put("tools", tools);
         
-        LOG.debug("Returning {} tools", tools.size());
+        LOG.debug("Returning {} tools in mode {}", tools.size(), toolMode);
         return response;
     }
 
@@ -450,6 +503,14 @@ public class McpServer {
     public void registerHandler(String method, McpHandler handler) {
         handlers.put(method, handler);
         LOG.debug("Registered handler for method: {}", method);
+    }
+
+    public McpHandler getHandler(String method) {
+        return handlers.get(method);
+    }
+
+    public Map<String, McpHandler> getHandlers() {
+        return Collections.unmodifiableMap(handlers);
     }
 
     /**

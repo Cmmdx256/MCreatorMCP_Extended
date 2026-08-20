@@ -331,9 +331,13 @@ public class MCPToolsService {
         // 25. listProcedureTriggers
         mcpServer.registerTool(McpServer.createTool(
             "listProcedureTriggers",
-            "List all available global procedure triggers in MCreator with descriptions and dependencies",
-            Map.of("type", "object", "properties", Map.of())
-        ), params -> listProcedureTriggers(mcreator));
+            "List available global procedure triggers in MCreator with descriptions and dependencies. Supports filtering by search keyword, group (e.g. 'entity', 'player', 'world'), or limit.",
+            Map.of("type", "object", "properties", Map.of(
+                "search", Map.of("type", "string", "description", "Optional search keyword to filter triggers by id or name"),
+                "group", Map.of("type", "string", "description", "Optional group filter (e.g. 'entity', 'player', 'world', 'block', 'server')"),
+                "limit", Map.of("type", "integer", "description", "Optional maximum number of triggers to return (default 50, 0 for all)")
+            ))
+        ), params -> listProcedureTriggers(mcreator, params));
 
         // 26. listProcedureBlocks
         mcpServer.registerTool(McpServer.createTool(
@@ -3055,42 +3059,91 @@ public class MCPToolsService {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;");
     }
 
-    /**
-     * List all procedure triggers
-     */
-    private McpTypes.ToolResult listProcedureTriggers(MCreator mcreator) {
-        try {
-            List<Map<String, Object>> list = new ArrayList<>();
-            if (BlocklyLoader.INSTANCE != null && BlocklyLoader.INSTANCE.getExternalTriggerLoader() != null) {
-                for (ExternalTrigger et : BlocklyLoader.INSTANCE.getExternalTriggerLoader().getExternalTriggers()) {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("id", et.getID());
-                    try {
-                        map.put("name", et.getName());
-                    } catch (Throwable t) {
-                        map.put("name", et.getID());
-                    }
-                    map.put("side", et.side);
-                    map.put("cancelable", et.cancelable);
-                    map.put("has_result", et.has_result);
+    private static final List<Map<String, Object>> CACHED_TRIGGERS = new ArrayList<>();
+    private static volatile boolean triggersCached = false;
 
-                    List<Map<String, String>> deps = new ArrayList<>();
-                    if (et.dependencies_provided != null) {
-                        for (Dependency dep : et.dependencies_provided) {
-                            if (dep != null) {
-                                Map<String, String> d = new HashMap<>();
-                                d.put("name", dep.getName());
-                                d.put("type", dep.getRawType());
-                                deps.add(d);
+    /**
+     * List all procedure triggers with caching and filtering
+     */
+    private McpTypes.ToolResult listProcedureTriggers(MCreator mcreator, Map<String, Object> params) {
+        try {
+            if (!triggersCached) {
+                synchronized (CACHED_TRIGGERS) {
+                    if (!triggersCached && BlocklyLoader.INSTANCE != null && BlocklyLoader.INSTANCE.getExternalTriggerLoader() != null) {
+                        CACHED_TRIGGERS.clear();
+                        for (ExternalTrigger et : BlocklyLoader.INSTANCE.getExternalTriggerLoader().getExternalTriggers()) {
+                            Map<String, Object> map = new LinkedHashMap<>();
+                            map.put("id", et.getID());
+                            try {
+                                map.put("name", et.getName());
+                            } catch (Throwable t) {
+                                map.put("name", et.getID());
                             }
+                            map.put("side", et.side);
+                            map.put("cancelable", et.cancelable);
+                            map.put("has_result", et.has_result);
+
+                            List<Map<String, String>> deps = new ArrayList<>();
+                            if (et.dependencies_provided != null) {
+                                for (Dependency dep : et.dependencies_provided) {
+                                    if (dep != null) {
+                                        Map<String, String> d = new LinkedHashMap<>();
+                                        d.put("name", dep.getName());
+                                        d.put("type", dep.getRawType());
+                                        deps.add(d);
+                                    }
+                                }
+                            }
+                            map.put("dependencies", deps);
+                            CACHED_TRIGGERS.add(map);
                         }
+                        triggersCached = true;
                     }
-                    map.put("dependencies", deps);
-                    list.add(map);
                 }
             }
-            String json = objectMapper.writeValueAsString(Map.of("triggers", list, "count", list.size()));
-            return createSuccessResult("MCreator procedure event triggers (" + list.size() + "):\n" + json);
+
+            String search = params != null ? (String) params.get("search") : null;
+            String group = params != null ? (String) params.get("group") : null;
+            int limit = 50;
+            if (params != null && params.get("limit") instanceof Number) {
+                limit = ((Number) params.get("limit")).intValue();
+            }
+
+            List<Map<String, Object>> filtered = new ArrayList<>();
+            for (Map<String, Object> trigger : CACHED_TRIGGERS) {
+                String id = (String) trigger.get("id");
+                String name = (String) trigger.get("name");
+
+                if (group != null && !group.trim().isEmpty()) {
+                    String g = group.trim().toLowerCase();
+                    if (!id.toLowerCase().startsWith(g) && !id.toLowerCase().contains(g)) {
+                        continue;
+                    }
+                }
+
+                if (search != null && !search.trim().isEmpty()) {
+                    String s = search.trim().toLowerCase();
+                    if (!id.toLowerCase().contains(s) && (name == null || !name.toLowerCase().contains(s))) {
+                        continue;
+                    }
+                }
+
+                filtered.add(trigger);
+                if (limit > 0 && filtered.size() >= limit) {
+                    break;
+                }
+            }
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("triggers", filtered);
+            response.put("returnedCount", filtered.size());
+            response.put("totalAvailable", CACHED_TRIGGERS.size());
+            if (limit > 0 && filtered.size() < CACHED_TRIGGERS.size() && (search == null || search.isEmpty()) && (group == null || group.isEmpty())) {
+                response.put("note", "Showing first " + limit + " triggers. Use 'search', 'group', or 'limit: 0' to see more.");
+            }
+
+            String json = objectMapper.writeValueAsString(response);
+            return createSuccessResult("MCreator procedure event triggers (" + filtered.size() + "/" + CACHED_TRIGGERS.size() + "):\n" + json);
         } catch (Exception e) {
             LOG.error("Error listing procedure triggers", e);
             return createErrorResult("Failed to list procedure triggers: " + e.getMessage());

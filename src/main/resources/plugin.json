@@ -22,8 +22,8 @@
   "javaplugin": "net.mcreator.MCreatorMCP.MCreatorMCP",
   "info": {
     "name": "MCreatorMCP",
-    "version": "3.0.0",
-    "description": "Universal Model Context Protocol (MCP) server integration for MCreator. Provides LLM AI tools to interact with MCreator workspaces, build projects, manage elements, import textures, and access workspace resources across all MCreator versions.",
+    "version": "4.0.0",
+    "description": "Native MCreator AI Plugin & Model Context Protocol (MCP) server integration. Features Embedded Project Intelligence Engine, Live UI & Editor Context Provider, Semantic Project Graph, and 9 High-Level Tools with 170 internal capabilities.",
     "author": "modpotato (forked by: cmmdx256)",
     "credits": "forked by: cmmdx256",
     "website": "https://github.com/modpotato/MCreatorMCP/",

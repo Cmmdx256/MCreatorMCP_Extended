@@ -1,56 +1,101 @@
-# MCreator MCP Integration Plugin (v3.0.0)
+# MCreatorMCP Extended — Native MCreator AI Plugin & Embedded Project Intelligence Engine (v4.0.0)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![MCreator](https://img.shields.io/badge/MCreator-2020.1%20--%202026.x%2B-orange.svg)](https://mcreator.net/)
 [![Java](https://img.shields.io/badge/Java-17%20%7C%2021%2B-red.svg)](https://adoptium.net/)
-[![MCP Tools](https://img.shields.io/badge/MCP%20Tools-170%20Tools-brightgreen.svg)](https://modelcontextprotocol.io/)
+[![MCP Tools](https://img.shields.io/badge/MCP%20Tools-9%20High--Level%20%2B%20170%20Core-brightgreen.svg)](https://modelcontextprotocol.io/)
 
-> **Author:** `modpotato`  
-> **Forked, Expanded & Maintained by:** `cmmdx256`
+> **Original Author:** `modpotato`  
+> **Forked, Architected & Maintained by:** `cmmdx256`
 
-A comprehensive, high-performance **Model Context Protocol (MCP)** server integration plugin for [MCreator](https://mcreator.net/). It exposes **170 native tools**, granular JSON property patching, deep static code analysis (security risks & tick-lag hazards), Java AST manipulation, Blockly XML DOM queries & edits, advanced procedural image/texture processing (normal maps, palette extractor, channel adjustments), recipe/loot table conflict detectors, Minecraft runtime crash & log debuggers, workspace snapshot backups, and full workspace automation to LLM agents (Claude Desktop, Antigravity, Cursor, Roo Code, Continue, etc.).
+A next-generation **Native MCreator AI Plugin & Model Context Protocol (MCP)** server integration for [MCreator](https://mcreator.net/). Running natively inside MCreator's JVM and UI lifecycle, it transforms MCreator into an AI-aware development platform equipped with real-time **Live UI & Editor Context Awareness**, an in-memory **Semantic Project Graph**, an **Incremental Change Indexer**, a **Multi-Stage Validator**, an **Atomic Transaction & Snapshot Rollback Engine**, and **9 High-Level Intelligence Tools** while maintaining 100% backwards compatibility with **170 low-level core capability tools**.
 
 ---
 
-## 🌟 Key Capabilities
+## 📜 Attribution, Licensing & Project History
 
-### ⚡ 100% Full-to-Full MCreator Control (170 Native Tools)
-Direct programmatic access to every subsystem in MCreator: Mod Elements (35+ types), Procedures & Blockly blocks, Tags, Localizations, 3D Models, Sounds, Textures, Animated Textures, Structures, Animations, Creative Tabs, Workspace Variables, Mod APIs, Gradle Tasks, and Workspace Folder trees.
+### 🤝 Project Lineage & Attribution
+* **Original Foundation:** Based on [`modpotato/MCreatorMCP`](https://github.com/modpotato/MCreatorMCP), originally created by **`modpotato`**.
+* **Extended Implementation:** Forked, completely re-architected, and maintained by **`cmmdx256`**. This extended version introduces the Embedded Project Intelligence Engine, Live MCreator UI Context Provider, Swing EDT UI Synchronizer, in-memory Semantic Project Graph, and a massive expansion from basic tools to 170+ native capabilities and 9 High-Level task execution tools.
 
-### 🔬 Granular Property Patching & Field Editor
-Read, patch, delete, bulk-update, and diff any nested JSON property in any mod element (`definition.foo.bar`) without having to overwrite or re-serialize entire files (`patchElementProperty`, `getElementProperty`, `removeElementProperty`, `bulkPatchElements`, `compareElements`).
+### ⚖️ License Transition & Compliance (MIT → GPL-3.0)
+The original foundation was initially published under the **MIT License**. Because MCreator itself is open-source software licensed under the **GNU General Public License v3.0 (GPL-3.0)**, and this extended plugin integrates deeply and directly with MCreator's core Java runtime classes, UI event lifecycle, and internal workspace APIs:
 
-### 🛡️ Deep Static Code, Mod Security & Performance Analyzer
-Scans workspace procedures and custom commands to identify severe tick performance hazards (e.g. while/repeat loops and area entity searches running on every tick), elevated command execution risks, missing localizations across all languages, unreferenced/orphaned assets, and circular element dependencies.
+1. **Licensing:** This project is officially distributed under the terms of the **GNU General Public License v3.0 (GPL-3.0)** to maintain 100% legal compatibility and full compliance with MCreator's upstream open-source license.
+2. **Original Notice Preservation:** In accordance with the MIT License terms, the original copyright notices and permissions from `modpotato` and Pylo are fully preserved in the source repository.
+3. **Open Source Guarantee:** All derivative works, enhancements, and plugin extensions remain free and open-source under GPL-3.0.
 
-### 📝 Java Source Code AST & Live Code Editor
-Inject code snippets at specific anchors or method boundaries, perform regex block replacements, manage class imports, format source files, and inspect Java class members (fields, methods, constructors) directly.
+---
 
-### 🧩 Blockly XML DOM Query & Node Editor
-Search opcode block types, replace field values, insert statement chains, remove nodes while preserving connections, convert procedure logic to readable pseudo-code summaries, and extract procedure-scoped variables.
+## 🌟 Key Architecture & Capabilities
 
-### 🎨 Advanced Texture Manipulation & Image Processing
-Extract dominant color palettes, swap exact hex colors, resize textures with nearest-neighbor interpolation, rotate/flip (90°, 180°, 270°, horizontal/vertical flip), adjust brightness/contrast, generate Sobel normal maps (`_n.png`), composite multiple texture layers, and crop subregions.
+```text
+                         AI CLIENT (Claude Desktop / Cursor / Antigravity)
+                                            │
+                                            │ MCP Protocol (JSON-RPC 2.0 via HTTP/SSE/Stdio)
+                                            ▼
+                  ┌───────────────────────────────────────────────────┐
+                  │          MCreatorMCP High-Level MCP Router         │
+                  │   (9 Public High-Level Tools / Multi-Mode Router)  │
+                  └─────────────────────────┬─────────────────────────┘
+                                            │
+                                            ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                           MCREATOR NATIVE RUNTIME & JVM                                     │
+│                                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                    MCREATOR LIVE CONTEXT PROVIDER (LiveContextProvider)               │  │
+│  │  • Active Editor Tab & Open ModElementGUI (`mcreator.getTabs().getCurrentTab()`)      │  │
+│  │  • Currently Selected Elements in Workspace Table (`WorkspacePanel.list`)             │  │
+│  │  • Active Folder Navigation (`FolderElement`) & Open Tabs                             │  │
+│  │  • Live Gradle Console & Build Process Stream                                         │  │
+│  └────────────────────────────────────────┬──────────────────────────────────────────────┘  │
+│                                           │                                                 │
+│  ┌────────────────────────────────────────▼──────────────────────────────────────────────┐  │
+│  │               EMBEDDED PROJECT INTELLIGENCE ENGINE (v4.0.0)                           │  │
+│  │  • In-Memory Project Model (`ProjectModel`)                                            │  │
+│  │  • Bi-directional Semantic Dependency Graph (`SemanticProjectGraph`)                  │  │
+│  │  • Incremental O(1) Indexer & Event Tracker (`IncrementalChangeTracker`)              │  │
+│  │  • Multi-Stage Pre/Post Validator (`ValidationEngine` - FreeMarker / TPS Lag Loops)    │  │
+│  │  • Atomic Transaction & Auto-Rollback Engine (`TransactionManager` / `Snapshot`)      │  │
+│  │  • Natural Language Intent Planner & Task Engine (`TaskEngine`)                       │  │
+│  └────────────────────────────────────────┬──────────────────────────────────────────────┘  │
+│                                           │                                                 │
+│  ┌────────────────────────────────────────▼──────────────────────────────────────────────┐  │
+│  │             INTERNAL CAPABILITY LAYER (170 Core Capabilities via Registry)            │  │
+│  │  • AST Code Injection • Blockly XML DOM Editor • Normal Map Generator • Conflict DB    │  │
+│  └────────────────────────────────────────┬──────────────────────────────────────────────┘  │
+│                                           │ SwingUtilities.invokeLater (EDT Safe)           │
+│                                           ▼                                                 │
+│  ┌───────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                         SWING EDT UI SYNCHRONIZER (UISynchronizer)                    │  │
+│  │  • `mcreator.reloadWorkspaceTabContents()` • `element.reinit()` • Live Workspace Sync │  │
+│  └───────────────────────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
-### 📋 Minecraft Client / Server Log & Crash Report Debugger
-Real-time capture of Gradle console output (`getGradleConsoleOutput`) and Minecraft runtime logs (`latest.log`, `debug.log`). Automatically parses `run/crash-reports/*.txt` to pinpoint the root cause (NullPointerException, Ticking BlockEntity, Missing Registry, Mixin conflicts) and identifies the exact culprit mod element or Java class (`analyzeCrashReport`).
+---
 
-### 📦 Workspace Snapshots & Backup System
-Create and restore full `.zip` workspace backups with timestamps (`createWorkspaceBackup`, `listWorkspaceBackups`, `restoreWorkspaceBackup`).
+## 🚀 9 Yüksek Seviyeli Akıl Aracı (High-Level Public MCP Tools)
 
-### 🌐 Multi-Transport Architecture
-- **HTTP POST**: `http://localhost:<port>/mcp` (Standard JSON-RPC 2.0)
-- **SSE Stream**: `http://localhost:<port>/mcp/sse` (Server-Sent Events)
-- **Stdio**: Direct standard input/output streaming
-- **Health Check**: `http://localhost:<port>/health`
-- **Dynamic Port Selection**: Automatically searches from port `5175` onwards to prevent port conflicts.
+| Tool | Parametreler | Açıklama |
+| :--- | :--- | :--- |
+| **`get_live_context`** | *(Yok)* | MCreator'ın anlık durumunu döner: Kullanıcının o an hangi sekmede çalıştığı, hangi mod elementi editörünün açık olduğu (`ModElementGUI`), seçili öğeler, aktif klasör ve Gradle durumu. |
+| **`analyze_project`** | *(Yok)* | Canlı MCreator bağlamını da dahil ederek tüm modun sağlığını, mimarisini, güvenlik risklerini, tick performans açıklarını ve bağımlılıklarını derinlemesine analiz eder. |
+| **`inspect_project`** | `targetName`, `queryType` | Semantik graf üzerinden element inceler. `targetName="current"` veya boş bırakılırsa ekranda açık olan aktif editör elementini otomatik odaklar. |
+| **`execute_task`** | `intent`, `steps`, `parameters` | Doğal dildeki hedefleri (örn. *"Gece hız veren kılıç yap"*) tek bir atomik transaction ve otomatik rollback garantisiyle yürütür; UI'ı anında tazeler. |
+| **`modify_project`** | `modifications` | Çoklu element, özellik, tag veya lokalizasyon değişikliklerini sıralı ve güvenli bir batch halinde uygular. |
+| **`create_element`** | `name`, `type`, `properties`, `procedureBinding` | Prosedür bağlama, özellik konfigürasyonu, etiketleme ve lokalizasyonu tek çağrıda birleştiren üst düzey element üreticisi. |
+| **`validate_project`** | *(Yok)* | FreeMarker simülasyonu, tick-rate TPS lag dedektörü ve bozuk referans taraması yapar. |
+| **`get_project_context`** | *(Yok)* | LLM istemcileri için özel olarak tasarlanmış, token tasarruflu ve canlı UI durumunu da içeren kompakt semantik proje özeti sunar. |
+| **`manage_tool_mode`** | `mode` | MCP çalışma modunu anında değiştirir: `DUAL_HYBRID` (Varsayılan: 9 High + 170 Low), `HIGH_LEVEL_ONLY` veya `LEGACY_FULL`. |
 
 ---
 
 ## 🚀 Quick Start & Installation
 
 ### 1. Plugin Kurulumu (Installation)
-1. Derlenmiş `MCreatorMCP.zip` dosyasını indirin veya projeyi derleyin (`./gradlew jar`).
+1. Derlenmiş `MCreatorMCP.zip` dosyasını indirin veya `./gradlew jar` ile derleyin.
 2. Dosyayı MCreator eklentiler klasörünüze kopyalayın:
    - **Windows:** `%USERPROFILE%\.mcreator\plugins\MCreatorMCP.zip`
    - **Linux / macOS:** `~/.mcreator\plugins\MCreatorMCP.zip`
@@ -70,13 +115,13 @@ Create and restore full `.zip` workspace backups with timestamps (`createWorkspa
 }
 ```
 
-#### Antigravity / Cursor / Roo Code (HTTP Endpoint)
+#### Antigravity / Cursor / Roo Code / Continue (Direct HTTP)
 - **URL:** `http://localhost:5175/mcp`
 - **Protocol:** `Streamable HTTP / SSE`
 
 ---
 
-## 📚 170 Araçlık Tam Referans Kataloğu (Full 170 Tools Reference)
+## 📚 170 Araçlık Tam Dahili Yetenek Kataloğu (Full Core Capabilities)
 
 ### 🔨 1. Build & Run
 | Araç | Açıklama |
@@ -123,7 +168,7 @@ Create and restore full `.zip` workspace backups with timestamps (`createWorkspa
 | Araç | Açıklama |
 | :--- | :--- |
 | `createProcedure` | Blockly XML veya hazır eylemlerle prosedür oluşturur. |
-| `listProcedureTriggers` | Tüm olay tetikleyicilerini (`player_ticks`, `entity_dies` vb.) hızlı DTO yapısıyla listeler. |
+| `listProcedureTriggers` | Tüm olay tetikleyicilerini (`player_ticks`, `entity_dies` vb.) bellek önbellekli DTO ve `search`/`group`/`limit` filtreleriyle listeler. |
 | `listProcedureBlocks` | Prosedür bloklarını kategori ve kelime filtresiyle arar. |
 | `linkProcedureToElement` | Prosedürü herhangi bir elementin olayına tek komutla bağlar. |
 | `validateProcedureXML` | Blockly XML dizilimini syntax ve blok bağlantıları açısından doğrular. |
@@ -330,14 +375,18 @@ Create and restore full `.zip` workspace backups with timestamps (`createWorkspa
 # Projeyi derleyin
 ./gradlew clean jar
 
-# Çıktı dosyası: build/libs/MCreatorMCP.zip
+# Üretilen çıktı paketi: build/libs/MCreatorMCP.zip
 ```
 
 ---
 
-## 📄 Lisans
+## 📄 Lisans & Yasal Uyarı (License & Legal Notice)
 
-Bu proje **GNU General Public License v3.0 (GPL-3.0)** altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakabilirsiniz.
+Bu proje **GNU General Public License v3.0 (GPL-3.0)** altında lisanslanmıştır.
+
+* **Orijinal Proje:** [modpotato/MCreatorMCP](https://github.com/modpotato/MCreatorMCP) (MIT Lisansı altında başlatılmıştır).
+* **Genişletilmiş Sürüm:** Bu çatal (fork), `cmmdx256` tarafından MCreator'ın (GPL-3.0) iç yapısıyla tam entegre çalışacak biçimde genişletilmiş ve **GPL-3.0** lisansı ile sunulmuştur.
+* Detaylar için [LICENSE](LICENSE) dosyasına bakabilirsiniz.
 
 ## 🔗 Bağlantılar
 

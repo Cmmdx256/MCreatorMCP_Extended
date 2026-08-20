@@ -71,6 +71,30 @@ public class MCreatorMCP extends JavaPlugin {
                             }
                         });
 
+                // Create Intelligence Status action
+                BasicAction intelligenceStatusAction = new BasicAction(event.getMCreator().getActionRegistry(),
+                        "Project Intelligence Summary",
+                        e -> {
+                            var overview = net.mcreator.MCreatorMCP.engine.ProjectIntelligenceEngine.getInstance().analyzeProject();
+                            showInfoDialog("Project Intelligence Engine", net.mcreator.MCreatorMCP.mcp.McpServer.toJsonStringStatic(overview));
+                        });
+
+                // Create Live Context action
+                BasicAction liveContextAction = new BasicAction(event.getMCreator().getActionRegistry(),
+                        "AI Live Context & Active Editor",
+                        e -> {
+                            var live = net.mcreator.MCreatorMCP.engine.ProjectIntelligenceEngine.getInstance().getLiveContextProvider().captureLiveContext();
+                            showInfoDialog("MCreator AI Live Context", net.mcreator.MCreatorMCP.mcp.McpServer.toJsonStringStatic(live));
+                        });
+
+                // Create Reindex Action
+                BasicAction reindexAction = new BasicAction(event.getMCreator().getActionRegistry(),
+                        "Re-Index Semantic Graph",
+                        e -> {
+                            net.mcreator.MCreatorMCP.engine.ProjectIntelligenceEngine.getInstance().reindex();
+                            showInfoDialog("Re-Index Complete", "Semantic Project Graph & Incremental Index re-built successfully.");
+                        });
+
                 // Create MCP status action
                 BasicAction mcpStatusAction = new BasicAction(event.getMCreator().getActionRegistry(),
                         "MCP Server Status",
@@ -86,6 +110,10 @@ public class MCreatorMCP extends JavaPlugin {
                 JMenu menu = new JMenu("MCP Tools");
                 menu.add(demoAction);
                 menu.add(repairAction);
+                menu.addSeparator();
+                menu.add(intelligenceStatusAction);
+                menu.add(liveContextAction);
+                menu.add(reindexAction);
                 menu.addSeparator();
                 menu.add(mcpStatusAction);
                 menu.add(mcpRestartAction);
@@ -103,6 +131,14 @@ public class MCreatorMCP extends JavaPlugin {
             }
         }));
 
+        addListener(net.mcreator.plugin.events.workspace.WorkspaceSavedEvent.class, event -> {
+            try {
+                if (event.getWorkspace() != null) {
+                    net.mcreator.MCreatorMCP.engine.ProjectIntelligenceEngine.getInstance().reindex();
+                }
+            } catch (Throwable ignored) {}
+        });
+
         LOG.info("MCreator MCP Plugin loaded - ready to start MCP server");
     }
 
@@ -118,8 +154,14 @@ public class MCreatorMCP extends JavaPlugin {
             // Set workspace in MCP server
             mcpServer.setWorkspace(event.getMCreator().getWorkspace());
             
-            // Register tools with MCP server
+            // Register low-level tools with MCP server
             toolsService.registerTools(mcpServer, event.getMCreator());
+
+            // Register high-level intelligence tools
+            net.mcreator.MCreatorMCP.engine.api.HighLevelToolRegistry.registerHighLevelTools(mcpServer, event.getMCreator());
+
+            // Initialize Project Intelligence Engine with MCreator instance and bind all internal capabilities
+            net.mcreator.MCreatorMCP.engine.ProjectIntelligenceEngine.getInstance().initialize(event.getMCreator().getWorkspace(), mcpServer, event.getMCreator());
 
             // Start HTTP transport
             httpTransport = new McpHttpTransport(mcpServer, httpPort);
@@ -129,12 +171,13 @@ public class MCreatorMCP extends JavaPlugin {
             stdioTransport = new McpStdioTransport(mcpServer);
             stdioTransport.start();
 
-            LOG.info("MCP server started successfully");
-            showInfoDialog("MCP Server Started", 
-                "MCP server is running:\n" +
-                "HTTP: http://localhost:" + httpPort + "/mcp\n" +
-                "SSE (legacy): http://localhost:" + httpPort + "/mcp/sse\n" +
-                "Stdio: Available for traditional MCP clients\n" +
+            LOG.info("Native MCreator AI Plugin & MCP Server started successfully");
+            showInfoDialog("MCreator AI Plugin & MCP Server Started", 
+                "MCreatorMCP Native Plugin is active:\n" +
+                "HTTP Endpoint: http://localhost:" + httpPort + "/mcp\n" +
+                "Live Context: Active Editor & Tab Awareness Enabled\n" +
+                "Tool Modes: DUAL_HYBRID (9 High-Level + 170 Low-Level Tools)\n" +
+                "Semantic Graph & Incremental Index: Running\n" +
                 "Health: http://localhost:" + httpPort + "/health");
 
         } catch (IOException e) {
