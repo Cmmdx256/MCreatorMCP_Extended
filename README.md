@@ -12,6 +12,12 @@ A next-generation **Native MCreator AI Plugin & Model Context Protocol (MCP)** s
 
 ---
 
+# Spoilers: 
+<img width="1279" height="781" alt="image" src="https://github.com/user-attachments/assets/5f2b6447-7af5-4c31-a057-499822b2b326" />
+
+
+---
+
 ## 📜 Attribution, Licensing & Project History
 
 ### 🤝 Project Lineage & Attribution
